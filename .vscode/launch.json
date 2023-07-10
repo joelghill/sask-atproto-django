@@ -5,6 +5,19 @@
     "version": "0.2.0",
     "configurations": [
         {
+            "name": "Python: Log Feed",
+            "type": "python",
+            "request": "launch",
+            "program": "${workspaceFolder}/manage.py",
+            "args": [
+                "start_feed",
+                "wss://bsky.social",
+                "--algorithm=logger"
+            ],
+            "django": true,
+            "justMyCode": false
+        },
+        {
             "name": "Python: Django",
             "type": "python",
             "request": "launch",

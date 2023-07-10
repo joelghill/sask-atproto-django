@@ -8,8 +8,10 @@ django = "*"
 gunicorn = "*"
 psycopg2-binary = "*"
 dj-database-url = "*"
+atproto = "*"
 
 [dev-packages]
+djlint = "*"
 
 [requires]
 python_version = "3.11"

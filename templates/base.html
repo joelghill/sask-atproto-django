@@ -32,16 +32,18 @@
                                 <a class="nav-link active" aria-current="page" href="{% url 'home' %}">Home</a>
                             </li>
                             {% if view_protected == True %}
-                            <li class="nav-item">
-                                <a class="nav-link active" aria-current="page" href="{% url 'protected' %}">Protected</a>
-                            </li>
+                                <li class="nav-item">
+                                    <a class="nav-link active"
+                                       aria-current="page"
+                                       href="{% url 'protected' %}">Protected</a>
+                                </li>
                             {% endif %}
                         </ul>
                         {% if user.is_anonymous == True %}
-                        <button class="btn btn-outline-success" type="submit">Login</button>
+                            <button class="btn btn-outline-success" type="submit">Login</button>
                         {% else %}
-                        <div class="me-3">Hello, {{ user.first_name }}</div>
-                        <button class="btn btn-outline-danger btn-sm" type="submit">Logout</button>
+                            <div class="me-3">Hello, {{ user.first_name }}</div>
+                            <button class="btn btn-outline-danger btn-sm" type="submit">Logout</button>
                         {% endif %}
                     </div>
                 </div>
