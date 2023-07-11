@@ -83,7 +83,7 @@ def run(name, operations_callback, stream_stop_event=None):
     client = FirehoseSubscribeReposClient(params)
 
     if not state:
-        SubscriptionState.objects.create(service=name, cursor=0)
+        state = SubscriptionState.objects.create(service=name, cursor=0)
 
     def on_message_handler(message: "MessageFrame") -> None:
         # stop on next message if requested
