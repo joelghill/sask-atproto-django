@@ -28,11 +28,11 @@ BASE_DIR = Path(__file__).resolve().parent.parent
 SECRET_KEY = os.getenv("DJANGO_SECRET_KEY", get_random_secret_key())
 
 # SECURITY WARNING: don't run with debug turned on in production!
-DEBUG = os.getenv("DJANGO_DEBUG", "FALSE").upper() == "TRUE"
+DEBUG = os.getenv("DJANGO_DEBUG", "TRUE").upper() == "TRUE"
 
 # Flag to indicate development mode.
 # SECURITY WARNING: don't run with dev mode turned on in production!
-DEVELOPMENT_MODE = os.getenv("DJANGO_DEVELOPMENT_MODE", "FALSE").upper() == "TRUE"
+DEVELOPMENT_MODE = os.getenv("DJANGO_DEVELOPMENT_MODE", "TRUE").upper() == "TRUE"
 
 ALLOWED_HOSTS = os.getenv("DJANGO_ALLOWED_HOSTS", "127.0.0.1,localhost").split(",")
 

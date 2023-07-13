@@ -12,6 +12,8 @@ atproto = "*"
 
 [dev-packages]
 djlint = "*"
+pytest-django = "*"
+pylint-django = "*"
 
 [requires]
 python_version = "3.11"
