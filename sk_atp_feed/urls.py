@@ -15,8 +15,20 @@ Including another URLconf
 """
 from django.contrib import admin
 from django.urls import include, path
+from flatlanders.views import DidJson, DescribeFeedGenerator, FeedSkeleton
 
 urlpatterns = [
     path("admin/", admin.site.urls),
     path("", include("django.contrib.auth.urls")),
+    path(".well-known/did.json", DidJson.as_view(), name="well_known_did"),
+    path(
+        "xrpc/app.bsky.feed.describeFeedGenerator",
+        DescribeFeedGenerator.as_view(),
+        name="describe_feed_generator",
+    ),
+    path(
+        "xrpc/app.bsky.feed.getFeedSkeleton",
+        FeedSkeleton.as_view(),
+        name="get_feed_skeleton",
+    ),
 ]
