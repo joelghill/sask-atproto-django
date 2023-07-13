@@ -1,0 +1,19 @@
+import pytest
+from flatlanders.models import Post, RegisteredUser
+
+
+@pytest.mark.django_db
+def test_post_create():
+    """Test that a post can be created"""
+    user = RegisteredUser.objects.create(did="did")
+    post = Post.objects.create(
+        uri="uri",
+        cid="cid",
+        author=user,
+        text="text",
+        reply_parent=None,
+        reply_root=None,
+    )
+
+    assert post.author.did == "did"
+    assert user.posts.first().uri == "uri"
