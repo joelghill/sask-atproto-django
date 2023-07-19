@@ -4,16 +4,17 @@ import sys
 import threading
 from django.core.management.base import BaseCommand
 
-from firehose.subscription import run
+from firehose.subscription import CommitOperations, run
+from flatlanders.algorithms import index_commit_operations
 
 
 logger = logging.getLogger(__name__)
 stream_stop_event = threading.Event()
 
 
-def log_post(commits: dict):
-    for post in commits.get("posts", {}).get("created", []):
-        print(post["record"].text)
+def log_post(commits: CommitOperations):
+    for post in commits.posts.created:
+        print(f"[{post.record.createdAt}]: {post.record_text}")
 
 
 def sigint_handler(*_):
@@ -48,4 +49,4 @@ class Command(BaseCommand):
         if options["algorithm"] == "logger":
             run(options["service"], log_post, stream_stop_event)
         elif options["algorithm"] == "flatlanders":
-            raise NotImplementedError
+            run(options["service"], index_commit_operations, stream_stop_event)

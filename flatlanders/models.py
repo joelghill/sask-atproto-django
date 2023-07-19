@@ -1,5 +1,48 @@
 """ This module contains the models for the flatlanders app. """
+from datetime import timezone, datetime, timedelta
 from django.db import models
+from atproto.xrpc_client.models.app.bsky.feed.post import Main as MainPost
+
+from firehose.subscription import CreatedRecordOperation
+
+
+class RegisteredUser(models.Model):
+    """Represents a registered user"""
+
+    # The DID of the user
+    did = models.CharField(max_length=255, primary_key=True)
+    # The date the user was indexed
+    indexed_at = models.DateTimeField(auto_now_add=True)
+    # The date the user was last updated
+    last_updated = models.DateTimeField(auto_now=True)
+    # Expiry date of the user. Defaults to now, which means the user is expired.
+    expires_at = models.DateTimeField(
+        auto_now_add=True,
+        null=True,
+    )
+
+    def is_active(self):
+        """Returns whether or not the user is active"""
+        return self.expires_at is None or self.expires_at > datetime.now(timezone.utc)
+
+    def is_registered(self):
+        """Returns whether or not the user is registered"""
+        return self.expires_at is None
+
+    def register(self):
+        """Registers the user"""
+        self.expires_at = None
+        self.save()
+
+    def expire(self):
+        """Expires the user"""
+        self.expires_at = datetime.now(timezone.utc)
+        self.save()
+
+    def extend(self, days: int):
+        """Extends the expiry date of the user"""
+        self.expires_at = datetime.now(timezone.utc) + timedelta(days=days)
+        self.save()
 
 
 class Post(models.Model):
@@ -28,15 +71,29 @@ class Post(models.Model):
     # Whether or not the post matched the algorithm
     is_community_match = models.BooleanField(default=False)
 
+    @classmethod
+    def from_post_record(
+        cls,
+        post_record: CreatedRecordOperation[MainPost],
+        is_community_match: bool,
+        author: RegisteredUser,
+    ) -> "Post":
+        """Creates a Post object from a firehose record.
 
-class RegisteredUser(models.Model):
-    """Represents a registered user"""
+        Args:
+            post_record (CreatedRecordOperation[MainPost]): Record object from firehose
+            is_community_match (bool): Wether or not the post matched the algorithm
+            author (RegisteredUser): Author of the post
 
-    # The DID of the user
-    did = models.CharField(max_length=255, primary_key=True)
-    # The date the user was indexed
-    indexed_at = models.DateTimeField(auto_now_add=True)
-    # The date the user was last updated
-    last_updated = models.DateTimeField(auto_now=True)
-    # Expiry date of the user
-    expires_at = models.DateTimeField(null=True)
+        Returns:
+            Post: The post instance
+        """
+        return cls.objects.create(
+            uri=post_record.uri,
+            cid=str(post_record.cid),
+            author=author,
+            text=post_record.record.text,
+            reply_parent=post_record.record_reply,
+            reply_root=post_record.record_reply_root,
+            is_community_match=is_community_match,
+        )

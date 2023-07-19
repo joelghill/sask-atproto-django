@@ -18,6 +18,19 @@
             "justMyCode": false
         },
         {
+            "name": "Python: Index Feed",
+            "type": "python",
+            "request": "launch",
+            "program": "${workspaceFolder}/manage.py",
+            "args": [
+                "start_feed",
+                "wss://bsky.social",
+                "--algorithm=flatlanders"
+            ],
+            "django": true,
+            "justMyCode": false
+        },
+        {
             "name": "Python: Django",
             "type": "python",
             "request": "launch",

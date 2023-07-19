@@ -1,0 +1,30 @@
+""" Module containing keywords for the Flatlanders algorithm. """
+
+
+SASK_WORDS = {
+    "sask",
+    "saskatchewan",
+    "saskatoon",
+    "saskatchatoon",
+    "saskatchewanians",
+    "saskatchewanian",
+    "city of regina",
+    "regina, sk",
+    "regina, sask",
+    "regina sask",
+    "regina sk",
+    "yxe",
+    "yxecc",
+    "yqr",
+    "yqrcc",
+    "skpoli",
+    "bunny hug",
+    "bunnyhug",
+    "bunny-hug",
+    "land of the living skies",
+    "western canada",
+    "canadian prairies",
+    "canadian prairie",
+    "prairie province",
+    "prairie provinces",
+}
