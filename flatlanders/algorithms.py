@@ -1,16 +1,22 @@
 import logging
 
-from datetime import datetime
+from datetime import datetime, timezone
+import re
 from typing import Iterable, List
 from django.conf import settings
 from django.db.models import F
-from firehose.subscription import CommitOperations, RecordOperations
-from flatlanders.models import Post, RegisteredUser
-from flatlanders.keywords import SASK_WORDS
 from atproto.xrpc_client.models.app.bsky.feed.post import Main as MainPost
 from atproto.xrpc_client.models.app.bsky.feed.like import Main as MainLike
 from atproto.xrpc_client.models.app.bsky.feed.repost import Main as MainRepost
 from atproto.xrpc_client.models.app.bsky.graph.follow import Main as MainFollow
+from firehose.subscription import (
+    CommitOperations,
+    CreatedRecordOperation,
+    RecordOperations,
+)
+from flatlanders.models import Follow, Post, RegisteredUser
+from flatlanders.keywords import SASK_WORDS
+from flatlanders.settings import FEEDGEN_ADMIN_DID
 
 
 logger = logging.getLogger(__name__)
@@ -59,14 +65,16 @@ def index_commit_operations(commits: CommitOperations):
     _process_created_posts(commits.posts.created)
     _process_deleted_posts(commits.posts.deleted)
 
-    _process_created_likes(commits.likes.created)
-    _process_deleted_likes(commits.likes.deleted)
+    # _process_created_likes(commits.likes.created)
+    # _process_deleted_likes(commits.likes.deleted)
 
-    _process_created_reposts(commits.reposts.created)
-    _process_deleted_reposts(commits.reposts.deleted)
+    # _process_created_reposts(commits.reposts.created)
+    # _process_deleted_reposts(commits.reposts.deleted)
+    _process_created_follows(commits.follows.created)
+    _process_deleted_follows(commits.follows.deleted)
 
 
-def _process_created_posts(created_posts: Iterable[RecordOperations[MainPost]]):
+def _process_created_posts(created_posts: Iterable[CreatedRecordOperation[MainPost]]):
     """Indexes a post from a commit operations object.
 
     1. Check as to whether or not the record text contains an SK keyword
@@ -82,8 +90,7 @@ def _process_created_posts(created_posts: Iterable[RecordOperations[MainPost]]):
         # Get the author of the post from the database
         author = RegisteredUser.objects.filter(did=post.author_did).first()
         # Get the text of the post and check if it contains an SK keyword
-        record_text = post.record.text.lower()
-        is_sask_post = any([word in record_text for word in SASK_WORDS])
+        is_sask_post = is_sask_text(post.record_text)
 
         # If the post is not a sask post, and we don't have an author, skip it
         if not author and not is_sask_post:
@@ -100,17 +107,17 @@ def _process_created_posts(created_posts: Iterable[RecordOperations[MainPost]]):
             elif not author.is_registered():
                 author.extend(3)
                 author.save()
-            logger.info("Indexing post from keyword match: %s", post.record.text)
+            logger.info("Indexing post from keyword match: %s", post.record_text)
             Post.from_post_record(post, is_sask_post, author)
 
-        elif author.is_active():
+        elif author and author.is_active():
             # Replies to non-indexed posts are ignored
             if (
                 post.record_reply
                 and not Post.objects.filter(uri=post.record_reply).exists()
             ):
                 continue
-            logger.info("Indexing post from registered author: %s", post.record.text)
+            logger.info("Indexing post from registered author: %s", post.record_text)
             Post.from_post_record(post, is_sask_post, author)
 
 
@@ -119,25 +126,73 @@ def _process_deleted_posts(uris: List[str]):
     if uris:
         Post.objects.filter(uri__in=uris).delete()
 
-def _process_created_likes(uris: List[str]):
+
+def _process_created_likes(like_operations: List[CreatedRecordOperation[MainLike]]):
     """Increments the likes of a post from the database"""
+    uris = [like.record_subject_uri for like in like_operations]
     if uris:
-        Post.objects.filter(uri__in=uris).update(likes=F('likes') + 1)
+        Post.objects.filter(uri__in=uris).update(likes=F("likes") + 1)
+
 
 def _process_deleted_likes(uris: List[str]):
     """Removes a like from a post from the database"""
     if uris:
-        Post.objects.filter(uri__in=uris).update(likes=F('likes') - 1)
+        Post.objects.filter(uri__in=uris).update(likes=F("likes") - 1)
 
-def _process_created_reposts(uris: List[str]):
+
+def _process_created_reposts(reposts: List[CreatedRecordOperation[MainRepost]]):
     """Increments the reposts of a post from the database"""
+    uris = [repost.record_subject_uri for repost in reposts]
     if uris:
-        Post.objects.filter(uri__in=uris).update(reposts=F('reposts') + 1)
+        Post.objects.filter(uri__in=uris).update(reposts=F("reposts") + 1)
+
 
 def _process_deleted_reposts(uris: List[str]):
     """Removes a repost from a post from the database"""
     if uris:
-        Post.objects.filter(uri__in=uris).update(reposts=F('reposts') - 1)
+        Post.objects.filter(uri__in=uris).update(reposts=F("reposts") - 1)
+
+
+def _process_created_follows(follows: List[CreatedRecordOperation[MainFollow]]):
+    """ If you follow the feed admin, you are added to the feed"""
+    for follow in follows:
+        if follow.record_subject_uri == FEEDGEN_ADMIN_DID:
+            Follow.objects.get_or_create(
+                uri=follow.uri,
+                cid=follow.cid,
+                subject=follow.record_subject_uri,
+                author=follow.author_did,
+            )
+
+            _, created_user = RegisteredUser.objects.get_or_create(
+                did=follow.author_did, defaults={"expires_at": None}
+            )
+
+            if created_user:
+                logger.info("New user registered: %s", follow.author_did)
+            else:
+                logger.info(
+                    "User already registered. Setting expiry to None: %s",
+                    follow.author_did,
+                )
+
+
+def _process_deleted_follows(unfollows: List[str]):
+    """ If you unfollow the feed admin, you are removed from the feed"""
+    for unfollow in unfollows:
+        record = Follow.objects.filter(uri=unfollow).first()
+        if record:
+            record.delete()
+            now = datetime.now(timezone.utc)
+            if record.subject == FEEDGEN_ADMIN_DID:
+                RegisteredUser.objects.filter(did=record.author).update(expires_at=now)
+                logger.info("User expired via unfollow: %s", record.author)
+
+
+def is_sask_text(text: str) -> bool:
+    """Returns True if the text contains an SK keyword"""
+    lower_text = text.lower()
+    return any([re.search(rf"\b{word}\b", lower_text) for word in SASK_WORDS])
 
 
 FLATLANDERS_URI = f"at://{settings.FEEDGEN_PUBLISHER_DID}/app.bsky.feed.generator/{settings.RECORD_NAME}"

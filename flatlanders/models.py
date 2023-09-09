@@ -45,11 +45,30 @@ class RegisteredUser(models.Model):
         self.save()
 
 
-class Post(models.Model):
+class Record(models.Model):
+    """Represents a generic record from a user"""
+
+    # The CID of the post
+    cid = models.CharField(max_length=255, null=True)
+
+    # The URI of the record
+    uri = models.CharField(max_length=255, primary_key=True)
+
+    class Meta:
+        abstract = True
+
+
+class Follow(Record):
     """Represents a post from a user"""
 
-    # The URI of the post
-    uri = models.CharField(max_length=255, primary_key=True)
+    # Person being followed
+    subject = models.TextField()
+    author = models.TextField()
+
+
+class Post(Record):
+    """Represents a post from a user"""
+
     # The CID of the post
     cid = models.CharField(max_length=255)
     # Author of the post. Relationship to RegsiteredUser
@@ -62,6 +81,8 @@ class Post(models.Model):
     reply_parent = models.CharField(max_length=255, null=True)
     # The root of the post
     reply_root = models.CharField(max_length=255, null=True)
+    # The date the post was created
+    created_at = models.DateTimeField(null=True)
     # The date the post was indexed
     indexed_at = models.DateTimeField(auto_now_add=True)
     # number of reposts
@@ -92,7 +113,8 @@ class Post(models.Model):
             uri=post_record.uri,
             cid=str(post_record.cid),
             author=author,
-            text=post_record.record.text,
+            text=post_record.record_text,
+            created_at=post_record.record_created_at,
             reply_parent=post_record.record_reply,
             reply_root=post_record.record_reply_root,
             is_community_match=is_community_match,

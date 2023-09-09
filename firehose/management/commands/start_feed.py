@@ -14,7 +14,7 @@ stream_stop_event = threading.Event()
 
 def log_post(commits: CommitOperations):
     for post in commits.posts.created:
-        print(f"[{post.record.createdAt}]: {post.record_text}")
+        print(f"[{post.record.created_at}]: {post.record_text}")
 
 
 def sigint_handler(*_):

@@ -1,3 +1,4 @@
+from datetime import datetime
 import logging
 import typing as t
 
@@ -37,18 +38,48 @@ class CreatedRecordOperation(t.Generic[T]):
         self.author_did = author
 
     @property
+    def record_created_at(self) -> datetime:
+        """Returns the created_at date of the record."""
+        datetime_str = ""
+        if isinstance(self.record, dict):
+            datetime_str = self.record.get("created_at", "")
+        else:
+            datetime_str = self.record.created_at
+        try:
+            return datetime.fromisoformat(datetime_str)
+        except ValueError:
+            logger.error("Invalid datetime string: %s", datetime_str, exc_info=True)
+            return datetime.now()
+
+    @property
+    def record_subject_uri(self) -> str | None:
+        """Returns the subject of the record, if it has one."""
+        if isinstance(self.record, dict):
+            return self.record.get("subject", {}).get("uri")
+        if not isinstance(self.record, Post) and self.record.subject:
+            if isinstance(self.record.subject, str):
+                return self.record.subject
+            else:
+                return self.record.subject.uri
+        return None
+
+    @property
     def record_text(self) -> str:
         """Returns the text of the record, if it has one."""
         if isinstance(self.record, dict):
             return self.record.get("text", "")
-        return self.record.text
+        return self.record.text  # type: ignore
 
     @property
     def record_reply(self) -> str | None:
         """Returns the reply of the record, if it has one."""
         if isinstance(self.record, dict):
             return self.record.get("reply", {}).get("parent", {}).get("uri")
-        if self.record.reply and self.record.reply.parent.uri:
+        if (
+            isinstance(self.record, Post)
+            and self.record.reply
+            and self.record.reply.parent.uri
+        ):
             return self.record.reply.parent.uri
 
         return None
@@ -58,7 +89,11 @@ class CreatedRecordOperation(t.Generic[T]):
         """Returns the root reply of the record, if it has one."""
         if isinstance(self.record, dict):
             return self.record.get("reply", {}).get("root", {}).get("uri")
-        if self.record.reply and self.record.reply.root.uri:
+        if (
+            isinstance(self.record, Post)
+            and self.record.reply
+            and self.record.reply.root.uri
+        ):
             return self.record.reply.root.uri
 
         return None
@@ -94,6 +129,10 @@ def _get_ops_by_type(
     commit: models.ComAtprotoSyncSubscribeRepos.Commit,
 ) -> CommitOperations:  # noqa: C901
     operation_by_type = CommitOperations()
+
+    # if commit is string, convert to bytes
+    if isinstance(commit.blocks, str):
+        commit.blocks = commit.blocks.encode()
 
     car = CAR.from_bytes(commit.blocks)
     for op in commit.ops:
@@ -149,6 +188,8 @@ def _get_ops_by_type(
                 operation_by_type.posts.deleted.append(str(uri))
             if uri.collection == models.ids.AppBskyGraphFollow:
                 operation_by_type.follows.deleted.append(str(uri))
+            if uri.collection == models.ids.AppBskyFeedRepost:
+                operation_by_type.reposts.deleted.append(str(uri))
 
     return operation_by_type
 

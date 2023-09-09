@@ -8,13 +8,11 @@ class PostAdmin(admin.ModelAdmin):
 
     list_display = (
         "uri",
-        "cid",
-        "author",
+        "is_community_match",
         "text",
         "indexed_at",
         "reposts",
         "likes",
-        "is_community_match",
     )
 
 
