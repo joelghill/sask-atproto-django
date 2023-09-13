@@ -246,7 +246,7 @@ def run(name, operations_callback, stream_stop_event=None):
     client = FirehoseSubscribeReposClient(params=params)
 
     # Setup muti-processing
-    workers_count = 2 # Fix later
+    workers_count = 1 # Fix later
     # if workers_count > 8:
     #     workers_count = 8
     max_queue_size = 500
