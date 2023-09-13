@@ -1,6 +1,6 @@
 import logging
 
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 import re
 from typing import Iterable, List
 from django.db.models import F
@@ -164,19 +164,17 @@ def _process_created_follows(follows: List[CreatedRecordOperation[MainFollow]]):
                 author=follow.author_did,
             )
 
-            user, created = RegisteredUser.objects.get_or_create(
-                did=follow.author_did, defaults={"expires_at": None}
-            )
+            user, created = RegisteredUser.objects.get_or_create(did=follow.author_did)
 
             if created:
                 logger.info("New user registered: %s", follow.author_did)
-            else:
-                user.expires_at = None
-                user.save()
-                logger.info(
-                    "User already registered. Setting expiry to None: %s",
-                    follow.author_did,
-                )
+
+            user.expires_at = None
+            user.save()
+            logger.info(
+                "Registering user: %s",
+                follow.author_did,
+            )
 
 
 def _process_deleted_follows(unfollows: List[str]):
@@ -185,9 +183,11 @@ def _process_deleted_follows(unfollows: List[str]):
         record = Follow.objects.filter(uri=unfollow).first()
         if record:
             record.delete()
-            now = datetime.now(timezone.utc)
+            yesterday = datetime.now(timezone.utc) - timedelta(days=1)
             if record.subject == FEEDGEN_ADMIN_DID:
-                RegisteredUser.objects.filter(did=record.author).update(expires_at=now)
+                RegisteredUser.objects.filter(did=record.author).update(
+                    expires_at=yesterday
+                )
                 logger.info("User expired via unfollow: %s", record.author)
 
 
@@ -195,5 +195,6 @@ def is_sask_text(text: str) -> bool:
     """Returns True if the text contains an SK keyword"""
     lower_text = text.lower()
     return any([re.search(rf"\b{word}\b", lower_text) for word in SASK_WORDS])
+
 
 ALGORITHMS = {FEEDGEN_URI: flatlanders_handler}
