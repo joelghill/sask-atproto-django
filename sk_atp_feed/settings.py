@@ -36,8 +36,9 @@ DEBUG = os.getenv("DJANGO_DEBUG", "TRUE").upper() == "TRUE"
 # SECURITY WARNING: don't run with dev mode turned on in production!
 DEVELOPMENT_MODE = os.getenv("DJANGO_DEVELOPMENT_MODE", "TRUE").upper() == "TRUE"
 
-ALLOWED_HOSTS = os.getenv("DJANGO_ALLOWED_HOSTS", "127.0.0.1,localhost").split(",")
+ALLOWED_HOSTS = os.getenv("DJANGO_ALLOWED_HOSTS", "0.0.0.0,127.0.0.1,localhost").split(",")
 
+CSRF_COOKIE_DOMAIN = os.getenv("DJANGO_CSRF_COOKIE_DOMAIN", None)
 
 # Application definition
 
