@@ -13,7 +13,7 @@ if os.getenv("DJANGO_DEBUG", "TRUE").upper() == "TRUE":
     workers = 2
     reload = True
 else:
-    workers = multiprocessing.cpu_count() * 2 - 1
+    workers = 2
 
 capture_output = True
 timeout = 60
