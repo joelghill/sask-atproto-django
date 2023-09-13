@@ -108,7 +108,7 @@ else:
             "HOST": FEEDGEN_DB_HOST,
             "PORT": FEEDGEN_DB_PORT,
             "OPTIONS": {
-                "sslmode": "verify-ca",
+                "sslmode": FEEDGEN_DB_SSL_MODE,
                 "sslrootcert": FEEDGEN_DB_SSL_CERT,
             },
         }
