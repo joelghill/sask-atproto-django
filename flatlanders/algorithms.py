@@ -30,7 +30,7 @@ def flatlanders_handler(limit: int = 20, cursor: str | None = None):
         if not indexed_at_timestamp or not cid:
             raise InvalidCursor(f"Malformed cursor: {cursor}")
 
-        indexed_at = datetime.fromtimestamp(int(indexed_at_timestamp))
+        indexed_at = datetime.fromtimestamp(float(indexed_at_timestamp))
 
         posts = Post.objects.filter(indexed_at__lt=indexed_at).order_by("-indexed_at")[
             :limit
@@ -40,7 +40,6 @@ def flatlanders_handler(limit: int = 20, cursor: str | None = None):
 
     feed = [{"post": post.uri} for post in posts]
 
-    cursor = None
     if posts:
         last = list(posts)[-1]
         cursor = f"{last.indexed_at.timestamp()}::{last.cid}"

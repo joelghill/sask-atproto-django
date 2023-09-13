@@ -49,9 +49,11 @@ class FeedSkeleton(View):
 
         try:
             cursor = request.GET.get("cursor", None)
-            limit = request.GET.get("limit", 20)
+            limit = request.GET.get("limit", "20")
+            # Convert limit to int
+            limit = int(limit)
             body = ALGORITHMS[uri](cursor=cursor, limit=limit)
-        except ValueError:
-            return HttpResponse("Malformed cursor", status=400)
+        except ValueError as error:
+            return HttpResponse(f"Malformed cursor:{error}", status=400)
 
         return JsonResponse(body)
