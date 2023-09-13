@@ -9,17 +9,13 @@ from atproto.xrpc_client.models.app.bsky.feed.post import Main as MainPost
 from atproto.xrpc_client.models.app.bsky.feed.like import Main as MainLike
 from atproto.xrpc_client.models.app.bsky.feed.repost import Main as MainRepost
 from atproto.xrpc_client.models.app.bsky.graph.follow import Main as MainFollow
-from firehose.subscription import (
-    CommitOperations,
-    CreatedRecordOperation,
-    RecordOperations,
-)
+from firehose.subscription import CommitOperations, CreatedRecordOperation
 from flatlanders.models import Follow, Post, RegisteredUser
 from flatlanders.keywords import SASK_WORDS
 from flatlanders.settings import FEEDGEN_ADMIN_DID
 
 
-logger = logging.getLogger(__name__)
+logger = logging.getLogger("feed")
 
 
 class InvalidCursor(ValueError):
@@ -30,6 +26,7 @@ def flatlanders_handler(limit: int = 20, cursor: str | None = None):
     """Return the feed skeleton for the flatlanders algorithm"""
     indexed_at: datetime | None = None
     if cursor:
+        logger.debug("Incoming cursor: %s", cursor)
         (indexed_at_timestamp, cid) = cursor.split("::")
         if not indexed_at_timestamp or not cid:
             raise InvalidCursor(f"Malformed cursor: {cursor}")
@@ -49,6 +46,7 @@ def flatlanders_handler(limit: int = 20, cursor: str | None = None):
         last = list(posts)[-1]
         cursor = f"{last.indexed_at.timestamp()}::{last.cid}"
 
+    logger.debug("Outgoing cursor: %s", cursor)
     return {
         "cursor": cursor,
         "feed": feed,
@@ -98,19 +96,22 @@ def _process_created_posts(created_posts: Iterable[CreatedRecordOperation[MainPo
 
         # If we have a sask post, update the author record
         if is_sask_post:
+            logger.debug("Post contains SK keyword: %s", post.record_text)
             # If we don't have an author, create one
             if not author:
+                logger.debug("Creating new author: %s", post.author_did)
                 author = RegisteredUser.objects.create(did=post.author_did)
                 logger.info("New author registered: %s", author.did)
             # If the author is not active, and the post is a sask post, extend their
             # active status by 3 days and save the author
             elif not author.is_registered():
-                author.extend(3)
+                author.extend(30)
                 author.save()
             logger.info("Indexing post from keyword match: %s", post.record_text)
             Post.from_post_record(post, is_sask_post, author)
 
         elif author and author.is_active():
+            logger.debug("Post from registered author: %s", post.record_text)
             # Replies to non-indexed posts are ignored
             if (
                 post.record_reply
@@ -154,9 +155,10 @@ def _process_deleted_reposts(uris: List[str]):
 
 
 def _process_created_follows(follows: List[CreatedRecordOperation[MainFollow]]):
-    """ If you follow the feed admin, you are added to the feed"""
+    """If you follow the feed admin, you are added to the feed"""
     for follow in follows:
         if follow.record_subject_uri == FEEDGEN_ADMIN_DID:
+            logger.info("User followed feed admin: %s", follow.author_did)
             Follow.objects.get_or_create(
                 uri=follow.uri,
                 cid=follow.cid,
@@ -164,13 +166,15 @@ def _process_created_follows(follows: List[CreatedRecordOperation[MainFollow]]):
                 author=follow.author_did,
             )
 
-            _, created_user = RegisteredUser.objects.get_or_create(
+            user, created = RegisteredUser.objects.get_or_create(
                 did=follow.author_did, defaults={"expires_at": None}
             )
 
-            if created_user:
+            if created:
                 logger.info("New user registered: %s", follow.author_did)
             else:
+                user.expires_at = None
+                user.save()
                 logger.info(
                     "User already registered. Setting expiry to None: %s",
                     follow.author_did,
@@ -178,7 +182,7 @@ def _process_created_follows(follows: List[CreatedRecordOperation[MainFollow]]):
 
 
 def _process_deleted_follows(unfollows: List[str]):
-    """ If you unfollow the feed admin, you are removed from the feed"""
+    """If you unfollow the feed admin, you are removed from the feed"""
     for unfollow in unfollows:
         record = Follow.objects.filter(uri=unfollow).first()
         if record:
@@ -193,7 +197,6 @@ def is_sask_text(text: str) -> bool:
     """Returns True if the text contains an SK keyword"""
     lower_text = text.lower()
     return any([re.search(rf"\b{word}\b", lower_text) for word in SASK_WORDS])
-
 
 FLATLANDERS_URI = f"at://{settings.FEEDGEN_PUBLISHER_DID}/app.bsky.feed.generator/{settings.RECORD_NAME}"
 ALGORITHMS = {FLATLANDERS_URI: flatlanders_handler}

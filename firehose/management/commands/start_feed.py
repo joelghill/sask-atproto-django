@@ -8,7 +8,7 @@ from firehose.subscription import CommitOperations, run
 from flatlanders.algorithms import index_commit_operations
 
 
-logger = logging.getLogger(__name__)
+logger = logging.getLogger("feed")
 stream_stop_event = threading.Event()
 
 

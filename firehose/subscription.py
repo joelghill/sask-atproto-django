@@ -1,5 +1,7 @@
-from datetime import datetime
+from datetime import datetime, timezone
 import logging
+from multiprocessing import Pool, Queue, Lock, cpu_count
+
 import typing as t
 
 from atproto import CAR, CID, AtUri, models
@@ -13,7 +15,7 @@ from atproto.xrpc_client.models.app.bsky.graph.follow import Main as Follow
 
 from firehose.models import SubscriptionState
 
-logger = logging.getLogger(__name__)
+logger = logging.getLogger("feed")
 
 
 if t.TYPE_CHECKING:
@@ -21,6 +23,9 @@ if t.TYPE_CHECKING:
 
 
 T = t.TypeVar("T", Post, Like, Repost, Follow)
+
+# Lock used for multiprocessing
+mutex = Lock()
 
 
 class CreatedRecordOperation(t.Generic[T]):
@@ -40,16 +45,25 @@ class CreatedRecordOperation(t.Generic[T]):
     @property
     def record_created_at(self) -> datetime:
         """Returns the created_at date of the record."""
-        datetime_str = ""
+        datetime_value = ""
         if isinstance(self.record, dict):
-            datetime_str = self.record.get("created_at", "")
+            datetime_value = self.record.get("created_at", "")
         else:
-            datetime_str = self.record.created_at
+            datetime_value = self.record.created_at
         try:
-            return datetime.fromisoformat(datetime_str)
+            # Convert to date if string
+            if datetime_value and isinstance(datetime_value, str):
+                return datetime.fromisoformat(datetime_value)
+            elif datetime_value and isinstance(datetime_value, datetime):
+                return datetime_value
+            else:
+                return datetime.now(timezone.utc)
+
         except ValueError:
-            logger.error("Invalid datetime string: %s", datetime_str, exc_info=True)
-            return datetime.now()
+            logger.error(
+                "Invalid datetime value string: %s", datetime_value, exc_info=True
+            )
+            return datetime.now(timezone.utc)
 
     @property
     def record_subject_uri(self) -> str | None:
@@ -194,35 +208,57 @@ def _get_ops_by_type(
     return operation_by_type
 
 
-def run(name, operations_callback, stream_stop_event=None):
-    state = SubscriptionState.objects.filter(service=name).first()
-
-    params = None
-    if state:
-        params = models.ComAtprotoSyncSubscribeRepos.Params(cursor=state.cursor)
-
-    client = FirehoseSubscribeReposClient(params)
-
-    if not state:
-        state = SubscriptionState.objects.create(service=name, cursor=0)
-
-    def on_message_handler(message: "MessageFrame") -> None:
+def process_queue(queue: Queue, stream_stop_event, client, state, operations_callback):
+    logger.info("Starting subscription worker")
+    while True:
+        message: MessageFrame = queue.get()
         # stop on next message if requested
-        if stream_stop_event and stream_stop_event.is_set():
-            client.stop()
-            return
+        with mutex:
+            if stream_stop_event and stream_stop_event.is_set():
+                client.stop()
+                return
 
         commit = parse_subscribe_repos_message(message)
         if not isinstance(commit, models.ComAtprotoSyncSubscribeRepos.Commit):
             return
 
-        # update state after every frame
-        if commit.seq > state.cursor:
-            state.cursor = commit.seq
-        # save state every 20 frames
-        if commit.seq % 20 == 0:
-            state.save()
+        with mutex:
+            # update state after every frame
+            if commit.seq > state.cursor:
+                state.cursor = commit.seq
+            # save state every 20 frames
+            if commit.seq % 20 == 0:
+                state.save()
 
-        operations_callback(_get_ops_by_type(commit))
+            operations_callback(_get_ops_by_type(commit))
+
+
+def run(name, operations_callback, stream_stop_event=None):
+    # initialize client and state
+    state = SubscriptionState.objects.filter(service=name).first()
+
+    params = None
+    if state:
+        params = models.ComAtprotoSyncSubscribeRepos.Params(cursor=state.cursor)
+    else:
+        state = SubscriptionState.objects.create(service=name, cursor=0)
+
+    client = FirehoseSubscribeReposClient(params=params)
+
+    # Setup muti-processing
+    workers_count = cpu_count() * 2 - 1
+    if workers_count > 8:
+        workers_count = 8
+    max_queue_size = 500
+
+    queue = Queue(maxsize=max_queue_size)
+    pool = Pool(
+        workers_count,
+        process_queue,
+        (queue, stream_stop_event, client, state, operations_callback),
+    )
+
+    def on_message_handler(message: "MessageFrame") -> None:
+        queue.put(message)
 
     client.start(on_message_handler)

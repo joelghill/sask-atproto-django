@@ -39,9 +39,9 @@ class RegisteredUser(models.Model):
         self.expires_at = datetime.now(timezone.utc)
         self.save()
 
-    def extend(self, days: int):
+    def extend(self, minutes: int):
         """Extends the expiry date of the user"""
-        self.expires_at = datetime.now(timezone.utc) + timedelta(days=days)
+        self.expires_at = datetime.now(timezone.utc) + timedelta(minutes=minutes)
         self.save()
 
 

@@ -11,12 +11,13 @@ https://docs.djangoproject.com/en/4.1/ref/settings/
 """
 
 import os
-import sys
-
 from pathlib import Path
-import dj_database_url
 from django.core.management.utils import get_random_secret_key
+from dotenv import load_dotenv
 from flatlanders.settings import *  # noqa: F403, F401
+
+
+load_dotenv()
 
 # Build paths inside the project like this: BASE_DIR / 'subdir'.
 BASE_DIR = Path(__file__).resolve().parent.parent
@@ -87,18 +88,30 @@ WSGI_APPLICATION = "sk_atp_feed.wsgi.application"
 # Database
 # https://docs.djangoproject.com/en/4.1/ref/settings/#databases
 
-if DEVELOPMENT_MODE is True:
+# Set to postgres to use postgres, or leave blank to use sqlite
+FEEDGEN_DB_TYPE = os.getenv("FEEDGEN_DB_TYPE", "sqlite")
+
+if FEEDGEN_DB_TYPE == "sqlite":
     DATABASES = {
         "default": {
             "ENGINE": "django.db.backends.sqlite3",
             "NAME": os.path.join(BASE_DIR, "db.sqlite3"),
         }
     }
-elif len(sys.argv) > 0 and sys.argv[1] != "collectstatic":
-    if os.getenv("DATABASE_URL", None) is None:
-        raise Exception("DATABASE_URL environment variable not defined")
+else:
     DATABASES = {
-        "default": dj_database_url.parse(os.environ.get("DATABASE_URL")),
+        "default": {
+            "ENGINE": "django.db.backends.postgresql",
+            "NAME": FEEDGEN_DB_NAME,
+            "USER": FEEDGEN_DB_USERNAME,
+            "PASSWORD": FEEDGEN_DB_PASSWORD,
+            "HOST": FEEDGEN_DB_HOST,
+            "PORT": FEEDGEN_DB_PORT,
+            "OPTIONS": {
+                "sslmode": "verify-ca",
+                "sslrootcert": FEEDGEN_DB_SSL_CERT,
+            },
+        }
     }
 
 
@@ -155,6 +168,11 @@ LOGGING = {
         "django": {
             "handlers": ["console"],
             "level": os.getenv("DJANGO_LOG_LEVEL", "INFO"),
+            "propagate": False,
+        },
+        "feed": {
+            "handlers": ["console"],
+            "level": os.getenv("FEEDGEN_LOG_LEVEL", "DEBUG"),
             "propagate": False,
         },
     },

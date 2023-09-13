@@ -9,6 +9,7 @@ gunicorn = "*"
 psycopg2-binary = "*"
 dj-database-url = "*"
 atproto = "*"
+python-dotenv = "*"
 
 [dev-packages]
 djlint = "*"

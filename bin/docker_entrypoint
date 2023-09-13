@@ -1,0 +1,36 @@
+#!/bin/bash
+
+set -e
+
+start_server() {
+    echo "Starting server..."
+    /app/.venv/bin/python manage.py migrate
+    exec /app/.venv/bin/gunicorn -c gunicorn.conf.py sk_atp_feed.wsgi
+}
+
+start_indexer() {
+    echo "Starting indexer..."
+    /app/.venv/bin/python manage.py migrate 
+    exec /app/.venv/bin/python manage.py start_feed "wss://bsky.social" --algorithm=flatlanders
+}
+
+start_nginx() {
+    echo "Starting server..."
+    exec nginx -g "daemon off;"
+}
+
+case $1 in
+server)
+    start_server
+    ;;
+server)
+    start_nginx
+    ;;
+indexer)
+    start_indexer
+    ;;
+*)
+    echo "Usage: $0 {server|indexer|nginx}"
+    exit 1
+    ;;
+esac

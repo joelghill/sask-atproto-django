@@ -3,7 +3,10 @@ Feed gen settings
 """
 
 import os
+from dotenv import load_dotenv
 
+
+load_dotenv()
 
 FEEDGEN_HOSTNAME = os.getenv("FEEDGEN_HOSTNAME", "feed.flatlander.social")
 FEEDGEN_SERVICE_DID = os.getenv("FEEDGEN_SERVICE_DID", f"did:web:{FEEDGEN_HOSTNAME}")
@@ -22,10 +25,6 @@ FEEDGEN_DB_NAME = os.getenv("FEEDGEN_DB_NAME", "feedgen")
 FEEDGEN_DB_SSL_CERT = os.getenv("FEEDGEN_DB_SSL_CERT", "")
 FEEDGEN_ADMIN_DID = os.getenv("FEEDGEN_ADMIN_DID", "did:plc:cug2evrqa3nhdbvlfd2cvtky")
 FEEDGEN_PUBLISHER_DID = os.getenv("FEEDGEN_PUBLISHER_DID", "")
-FEEDGEN_SUBSCRIPTION_RECONNECT_DELAY = int(
-    os.getenv("FEEDGEN_SUBSCRIPTION_RECONNECT_DELAY", "1000")
-)
-FEEDGEN_POST_THRESHOLD = int(os.getenv("FEEDGEN_POST_THRESHOLD", "2"))
 
 PUBLISHER_HANDLE = os.getenv("PUBLISHER_HANDLE", "")
 PUBLISHER_APP_PASSWORD = os.getenv("PUBLISHER_APP_PASSWORD", "")
