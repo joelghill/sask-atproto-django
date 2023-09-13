@@ -220,7 +220,7 @@ def process_queue(queue: Queue, stream_stop_event, client, state, operations_cal
 
         commit = parse_subscribe_repos_message(message)
         if not isinstance(commit, models.ComAtprotoSyncSubscribeRepos.Commit):
-            return
+            continue
 
         with mutex:
             # update state after every frame
