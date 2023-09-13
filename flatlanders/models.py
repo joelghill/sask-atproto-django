@@ -1,9 +1,13 @@
 """ This module contains the models for the flatlanders app. """
+import logging
 from datetime import timezone, datetime, timedelta
-from django.db import models
+from django.db import IntegrityError, models
 from atproto.xrpc_client.models.app.bsky.feed.post import Main as MainPost
 
 from firehose.subscription import CreatedRecordOperation
+
+
+logger = logging.getLogger("feed")
 
 
 class RegisteredUser(models.Model):
@@ -98,7 +102,7 @@ class Post(Record):
         post_record: CreatedRecordOperation[MainPost],
         is_community_match: bool,
         author: RegisteredUser,
-    ) -> "Post":
+    ):
         """Creates a Post object from a firehose record.
 
         Args:
@@ -109,13 +113,16 @@ class Post(Record):
         Returns:
             Post: The post instance
         """
-        return cls.objects.create(
-            uri=post_record.uri,
-            cid=str(post_record.cid),
-            author=author,
-            text=post_record.record_text,
-            created_at=post_record.record_created_at,
-            reply_parent=post_record.record_reply,
-            reply_root=post_record.record_reply_root,
-            is_community_match=is_community_match,
-        )
+        try:
+            cls.objects.create(
+                uri=post_record.uri,
+                cid=str(post_record.cid),
+                author=author,
+                text=post_record.record_text,
+                created_at=post_record.record_created_at,
+                reply_parent=post_record.record_reply,
+                reply_root=post_record.record_reply_root,
+                is_community_match=is_community_match,
+            )
+        except IntegrityError as error:
+            logger.error("Error creating post from record: %s", error)

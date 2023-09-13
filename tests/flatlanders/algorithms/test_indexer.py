@@ -24,6 +24,9 @@ def test_is_sask_text():
     spotify_link = "https://open.spotify.com/intl-ja/track/4H8yXebQbN6Hua9WGjSq1r?si=953dd974cc244673"
     assert is_sask_text(spotify_link) is False
 
+    youtube_link = "Also the screen flashes between light and dark mode when coming back to the app youtube.com/shorts/yXE-z..."
+    assert is_sask_text(youtube_link) is False
+
 
 @pytest.mark.django_db
 def test_index_new_sask_post():

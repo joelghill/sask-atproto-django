@@ -3,7 +3,6 @@ import logging
 from datetime import datetime, timezone
 import re
 from typing import Iterable, List
-from django.conf import settings
 from django.db.models import F
 from atproto.xrpc_client.models.app.bsky.feed.post import Main as MainPost
 from atproto.xrpc_client.models.app.bsky.feed.like import Main as MainLike
@@ -12,7 +11,7 @@ from atproto.xrpc_client.models.app.bsky.graph.follow import Main as MainFollow
 from firehose.subscription import CommitOperations, CreatedRecordOperation
 from flatlanders.models import Follow, Post, RegisteredUser
 from flatlanders.keywords import SASK_WORDS
-from flatlanders.settings import FEEDGEN_ADMIN_DID
+from flatlanders.settings import FEEDGEN_ADMIN_DID, FEEDGEN_URI
 
 
 logger = logging.getLogger("feed")
@@ -198,5 +197,4 @@ def is_sask_text(text: str) -> bool:
     lower_text = text.lower()
     return any([re.search(rf"\b{word}\b", lower_text) for word in SASK_WORDS])
 
-FLATLANDERS_URI = f"at://{settings.FEEDGEN_PUBLISHER_DID}/app.bsky.feed.generator/{settings.RECORD_NAME}"
-ALGORITHMS = {FLATLANDERS_URI: flatlanders_handler}
+ALGORITHMS = {FEEDGEN_URI: flatlanders_handler}

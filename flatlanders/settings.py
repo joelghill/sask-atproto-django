@@ -11,6 +11,7 @@ load_dotenv()
 FEEDGEN_HOSTNAME = os.getenv("FEEDGEN_HOSTNAME", "feed.flatlander.social")
 FEEDGEN_SERVICE_DID = os.getenv("FEEDGEN_SERVICE_DID", f"did:web:{FEEDGEN_HOSTNAME}")
 FEEDGEN_LISTENHOST = os.getenv("FEEDGEN_LISTENHOST", "localhost")
+FEEDGEN_URI = os.getenv("FEEDGEN_URI")
 FEEDGEN_SUBSCRIPTION_ENDPOINT = os.getenv(
     "FEEDGEN_SUBSCRIPTION_ENDPOINT", "wss://bsky.social"
 )

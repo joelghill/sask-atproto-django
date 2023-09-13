@@ -38,7 +38,7 @@ DEVELOPMENT_MODE = os.getenv("DJANGO_DEVELOPMENT_MODE", "TRUE").upper() == "TRUE
 
 ALLOWED_HOSTS = os.getenv("DJANGO_ALLOWED_HOSTS", "0.0.0.0,127.0.0.1,localhost").split(",")
 
-CSRF_TRUSTED_ORIGINS = os.getenv("DJANGO_CSRF_TRUSTED_ORIGINS", "localhost").split(",")
+CSRF_TRUSTED_ORIGINS = os.getenv("DJANGO_CSRF_TRUSTED_ORIGINS", "http://localhost").split(",")
 
 # Application definition
 

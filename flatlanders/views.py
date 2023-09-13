@@ -1,4 +1,4 @@
-from django.http import JsonResponse
+from django.http import JsonResponse, HttpResponse
 from django.views import View
 
 from django.conf import settings
@@ -45,13 +45,13 @@ class FeedSkeleton(View):
         uri = request.GET.get("feed", None)
 
         if uri not in ALGORITHMS:
-            return "Unsupported algorithm", 400
+            return HttpResponse("Unsupported algorithm", status=400)
 
         try:
             cursor = request.GET.get("cursor", None)
             limit = request.GET.get("limit", 20)
             body = ALGORITHMS[uri](cursor=cursor, limit=limit)
         except ValueError:
-            return "Malformed cursor", 400
+            return HttpResponse("Malformed cursor", status=400)
 
         return JsonResponse(body)
