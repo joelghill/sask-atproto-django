@@ -1,7 +1,8 @@
 """ This module contains the models for the flatlanders app. """
 import logging
-from datetime import timezone, datetime, timedelta
+from datetime import timedelta
 from django.db import IntegrityError, models
+from django.utils import timezone
 from atproto.xrpc_client.models.app.bsky.feed.post import Main as MainPost
 
 from firehose.subscription import CreatedRecordOperation
@@ -27,7 +28,7 @@ class RegisteredUser(models.Model):
 
     def is_active(self):
         """Returns whether or not the user is active"""
-        return self.expires_at is None or self.expires_at > datetime.now(timezone.utc)
+        return self.expires_at is None or self.expires_at > timezone.now()
 
     def is_registered(self):
         """Returns whether or not the user is registered"""
@@ -40,12 +41,12 @@ class RegisteredUser(models.Model):
 
     def expire(self):
         """Expires the user"""
-        self.expires_at = datetime.now(timezone.utc)
+        self.expires_at = timezone.now()
         self.save()
 
     def extend(self, minutes: int):
         """Extends the expiry date of the user"""
-        self.expires_at = datetime.now(timezone.utc) + timedelta(minutes=minutes)
+        self.expires_at = timezone.now() + timedelta(minutes=minutes)
         self.save()
 
 

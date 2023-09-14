@@ -1,6 +1,6 @@
-from datetime import datetime
 from unittest.mock import MagicMock
 from atproto import CID
+from django.utils import timezone
 
 import pytest
 from firehose.subscription import (
@@ -34,7 +34,7 @@ def test_index_new_sask_post():
     uri = "test_uri"
     cid = MagicMock(spec=CID)
     author_did = "test_author_did"
-    post_record = MainPost(createdAt=datetime.now().isoformat(), text="Saskatchewan")
+    post_record = MainPost(createdAt=timezone.now().isoformat(), text="Saskatchewan")
     create_record_operation = CreatedRecordOperation[MainPost](
         post_record, uri, cid, author_did
     )

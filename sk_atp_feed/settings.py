@@ -40,6 +40,9 @@ ALLOWED_HOSTS = os.getenv("DJANGO_ALLOWED_HOSTS", "0.0.0.0,127.0.0.1,localhost")
 
 CSRF_TRUSTED_ORIGINS = os.getenv("DJANGO_CSRF_TRUSTED_ORIGINS", "http://localhost").split(",")
 
+USE_TZ = True
+TIME_ZONE = "UTC"
+
 # Application definition
 
 INSTALLED_APPS = [

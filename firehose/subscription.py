@@ -1,7 +1,6 @@
-from datetime import datetime, timezone
+from datetime import datetime
 import logging
 from multiprocessing import Pool, Queue, Lock, cpu_count
-
 import typing as t
 
 from atproto import CAR, CID, AtUri, models
@@ -12,6 +11,7 @@ from atproto.xrpc_client.models.app.bsky.feed.like import Main as Like
 from atproto.xrpc_client.models.app.bsky.feed.repost import Main as Repost
 from atproto.xrpc_client.models.app.bsky.graph.follow import Main as Follow
 
+from django.utils import timezone
 
 from firehose.models import SubscriptionState
 
@@ -57,13 +57,13 @@ class CreatedRecordOperation(t.Generic[T]):
             elif datetime_value and isinstance(datetime_value, datetime):
                 return datetime_value
             else:
-                return datetime.now(timezone.utc)
+                return timezone.now()
 
         except ValueError:
             logger.error(
                 "Invalid datetime value string: %s", datetime_value, exc_info=True
             )
-            return datetime.now(timezone.utc)
+            return timezone.now()
 
     @property
     def record_subject_uri(self) -> str | None:
@@ -246,7 +246,7 @@ def run(name, operations_callback, stream_stop_event=None):
     client = FirehoseSubscribeReposClient(params=params)
 
     # Setup muti-processing
-    workers_count = 1 # Fix later
+    workers_count = 1  # Fix later
     # if workers_count > 8:
     #     workers_count = 8
     max_queue_size = 500
