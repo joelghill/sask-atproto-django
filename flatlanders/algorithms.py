@@ -21,7 +21,7 @@ class InvalidCursor(ValueError):
     """Raised when the cursor is malformed"""
 
 
-def flatlanders_handler(limit: int = 20, cursor: str | None = None):
+def flatlanders_handler(limit: int = 50, cursor: str | None = None):
     """Return the feed skeleton for the flatlanders algorithm"""
     indexed_at: datetime | None = None
     if cursor:
@@ -32,17 +32,20 @@ def flatlanders_handler(limit: int = 20, cursor: str | None = None):
 
         indexed_at = datetime.fromtimestamp(float(indexed_at_timestamp))
 
-        posts = Post.objects.filter(indexed_at__lt=indexed_at).order_by("-indexed_at")[
-            :limit
-        ]
+        posts = Post.objects.filter(created_at__lt=indexed_at).order_by(
+            "-created_at", "-indexed_at"
+        )[:limit]
     else:
-        posts = Post.objects.order_by("-indexed_at")[:limit]
+        posts = Post.objects.order_by("-created_at", "-indexed_at")[:limit]
 
     feed = [{"post": post.uri} for post in posts]
 
     if posts:
         last = list(posts)[-1]
-        cursor = f"{last.indexed_at.timestamp()}::{last.cid}"
+        if last.created_at:
+            cursor = f"{last.created_at.timestamp()}::{last.cid}"
+        else:
+            cursor = f"{last.indexed_at.timestamp()}::{last.cid}"
 
     logger.debug("Outgoing cursor: %s", cursor)
     return {
