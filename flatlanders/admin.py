@@ -11,9 +11,10 @@ class PostAdmin(admin.ModelAdmin):
         "is_community_match",
         "text",
         "indexed_at",
-        "reposts",
-        "likes",
+        "created_at",
     )
+
+    search_fields = ("uri", "text", "author__did")
 
 
 class RegisteredUserAdmin(admin.ModelAdmin):
@@ -25,6 +26,8 @@ class RegisteredUserAdmin(admin.ModelAdmin):
         "last_updated",
         "expires_at",
     )
+
+    search_fields = ("did",)
 
 
 admin.site.register(Post, PostAdmin)

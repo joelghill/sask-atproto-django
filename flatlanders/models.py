@@ -22,7 +22,7 @@ class RegisteredUser(models.Model):
     last_updated = models.DateTimeField(auto_now=True)
     # Expiry date of the user. Defaults to now, which means the user is expired.
     expires_at = models.DateTimeField(
-        auto_now_add=True,
+        default=timezone.now,
         null=True,
     )
 

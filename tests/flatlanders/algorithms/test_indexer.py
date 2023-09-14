@@ -3,18 +3,18 @@ from atproto import CID
 from django.utils import timezone
 
 import pytest
+from atproto.xrpc_client.models.app.bsky.feed.post import Main as MainPost
+from atproto.xrpc_client.models.app.bsky.feed.like import Main as MainLike
+from atproto.xrpc_client.models.app.bsky.feed.repost import Main as MainRepost
+from atproto.xrpc_client.models.app.bsky.graph.follow import Main as MainFollow
+from atproto.xrpc_client.models.com.atproto.repo.strong_ref import Main as MainStrongRef
 from firehose.subscription import (
     CommitOperations,
     CreatedRecordOperation,
 )
 from flatlanders.algorithms import index_commit_operations, is_sask_text
-
-from atproto.xrpc_client.models.app.bsky.feed.post import Main as MainPost
-from atproto.xrpc_client.models.app.bsky.feed.like import Main as MainLike
-from atproto.xrpc_client.models.app.bsky.feed.repost import Main as MainRepost
-from atproto.xrpc_client.models.com.atproto.repo.strong_ref import Main as MainStrongRef
-
 from flatlanders.models import Post, RegisteredUser
+from flatlanders.settings import FEEDGEN_ADMIN_DID, FEEDGEN_URI
 
 
 def test_is_sask_text():
@@ -49,8 +49,36 @@ def test_index_new_sask_post():
     assert Post.objects.count() == 1
     assert Post.objects.first().text == "Saskatchewan"
 
-    assert RegisteredUser.objects.count() == 1
-    assert RegisteredUser.objects.first().did == author_did
+    registered_user = RegisteredUser.objects.get(did=author_did)
+
+    assert (
+        registered_user.expires_at is not None
+        and registered_user.expires_at <= timezone.now()
+    )
+
+
+@pytest.mark.django_db
+def test_index_flatlander_follow():
+    # Creation of post record
+    uri = "test_uri"
+    cid = "test_cid"
+    author_did = "test_author_did"
+    post_record = MainFollow(
+        createdAt=timezone.now().isoformat(), subject=FEEDGEN_ADMIN_DID
+    )
+    create_record_operation = CreatedRecordOperation[MainFollow](
+        post_record, uri, cid, author_did
+    )
+
+    # Creation of commit operations
+    operations = CommitOperations()
+    operations.follows.created.append(create_record_operation)
+
+    # Indexing of commit operations
+    index_commit_operations(operations)
+
+    registered_user = RegisteredUser.objects.get(did=author_did)
+    assert registered_user.expires_at is None
 
 
 # @pytest.mark.django_db

@@ -167,13 +167,13 @@ def _process_created_follows(follows: List[CreatedRecordOperation[MainFollow]]):
                 author=follow.author_did,
             )
 
-            user, created = RegisteredUser.objects.get_or_create(did=follow.author_did)
+            _, created = RegisteredUser.objects.get_or_create(
+                did=follow.author_did, defaults={"expires_at": None}
+            )
 
             if created:
                 logger.info("New user registered: %s", follow.author_did)
 
-            user.expires_at = None
-            user.save()
             logger.info(
                 "Registering user: %s",
                 follow.author_did,
