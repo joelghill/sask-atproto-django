@@ -1,5 +1,6 @@
 """ Admin classes for flatlanders app """
 from django.contrib import admin
+from django.db.models.query import QuerySet
 from .models import Post, RegisteredUser
 
 
@@ -28,6 +29,12 @@ class RegisteredUserAdmin(admin.ModelAdmin):
     )
 
     search_fields = ("did",)
+    actions = ["make_registered"]
+
+    @admin.action(description="Mark selected users as registered")
+    def make_registered(self, request, queryset: QuerySet[RegisteredUser]):
+        queryset.update(expires_at=None)
+
 
 
 admin.site.register(Post, PostAdmin)
