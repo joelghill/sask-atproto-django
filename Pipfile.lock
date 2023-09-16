@@ -43,11 +43,11 @@
         },
         "atproto": {
             "hashes": [
-                "sha256:114484fe0d1dcab8f4dfda12a407d100661184c7e572061a1a62acc1b3f78717",
-                "sha256:45901791cd68d956d96f9dce27d15c4287cd84c01591a97a6625a2bc988a7b0c"
+                "sha256:043d5797243ebbf51e6cb11f55c7a0663b90c3dd4de8faba1a5e4d116ebd5d20",
+                "sha256:bf64bef88efd170fceeaf26aa8baa3bdaddce6b0c979c4a3b1aaeb7a22d777bc"
             ],
             "index": "pypi",
-            "version": "==0.0.27"
+            "version": "==0.0.28"
         },
         "certifi": {
             "hashes": [

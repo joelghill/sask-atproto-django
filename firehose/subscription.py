@@ -226,6 +226,7 @@ def process_queue(queue: Queue, stream_stop_event, client, state, operations_cal
             # update state after every frame
             if commit.seq > state.cursor:
                 state.cursor = commit.seq
+                client.update_params(models.ComAtprotoSyncSubscribeRepos.Params(cursor=commit.seq))
             # save state every 20 frames
             if commit.seq % 20 == 0:
                 state.save()
