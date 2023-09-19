@@ -51,8 +51,8 @@ def flatlanders_handler(limit: int = 50, cursor: str | None = None):
             else:
                 cursor = f"{last.indexed_at.timestamp()}::{last.cid}"
         else:
-            # No more posts, no cursor
-            cursor = None
+            # No more posts, no cursor. Must be empty string
+            cursor = ""
 
         logger.debug("Outgoing cursor: %s", cursor)
     except Exception as error:
