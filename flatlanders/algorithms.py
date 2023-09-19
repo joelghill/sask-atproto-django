@@ -37,10 +37,10 @@ def flatlanders_handler(limit: int = 50, cursor: str | None = None):
             )
 
             posts = Post.objects.filter(created_at__lt=indexed_at).order_by(
-                "-created_at", "-indexed_at"
+                "-created_at"
             )[:limit]
         else:
-            posts = Post.objects.order_by("-created_at", "-indexed_at")[:limit]
+            posts = Post.objects.order_by("-created_at")[:limit]
 
         feed = [{"post": post.uri} for post in posts]
 
