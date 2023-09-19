@@ -163,6 +163,14 @@ LOGGING = {
         "console": {
             "class": "logging.StreamHandler",
         },
+        "server": {
+            "class": "logging.FileHandler",
+            "filename": "server.log",
+        },
+        "index": {
+            "class": "logging.FileHandler",
+            "filename": "index.log",
+        },
     },
     "root": {
         "handlers": ["console"],
@@ -170,12 +178,12 @@ LOGGING = {
     },
     "loggers": {
         "django": {
-            "handlers": ["console"],
+            "handlers": ["console", "server"],
             "level": os.getenv("DJANGO_LOG_LEVEL", "INFO"),
             "propagate": False,
         },
         "feed": {
-            "handlers": ["console"],
+            "handlers": ["console", "index"],
             "level": os.getenv("FEEDGEN_LOG_LEVEL", "DEBUG"),
             "propagate": False,
         },
