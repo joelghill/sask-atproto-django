@@ -10,6 +10,7 @@ psycopg2-binary = "*"
 dj-database-url = "*"
 atproto = "*"
 python-dotenv = "*"
+wagtail = "*"
 
 [dev-packages]
 djlint = "*"

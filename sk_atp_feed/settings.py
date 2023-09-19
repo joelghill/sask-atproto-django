@@ -36,9 +36,13 @@ DEBUG = os.getenv("DJANGO_DEBUG", "TRUE").upper() == "TRUE"
 # SECURITY WARNING: don't run with dev mode turned on in production!
 DEVELOPMENT_MODE = os.getenv("DJANGO_DEVELOPMENT_MODE", "TRUE").upper() == "TRUE"
 
-ALLOWED_HOSTS = os.getenv("DJANGO_ALLOWED_HOSTS", "0.0.0.0,127.0.0.1,localhost").split(",")
+ALLOWED_HOSTS = os.getenv("DJANGO_ALLOWED_HOSTS", "0.0.0.0,127.0.0.1,localhost").split(
+    ","
+)
 
-CSRF_TRUSTED_ORIGINS = os.getenv("DJANGO_CSRF_TRUSTED_ORIGINS", "http://localhost").split(",")
+CSRF_TRUSTED_ORIGINS = os.getenv(
+    "DJANGO_CSRF_TRUSTED_ORIGINS", "http://localhost"
+).split(",")
 
 USE_TZ = True
 TIME_ZONE = "UTC"
@@ -52,6 +56,19 @@ INSTALLED_APPS = [
     "django.contrib.sessions",
     "django.contrib.messages",
     "django.contrib.staticfiles",
+    "wagtail.contrib.forms",
+    "wagtail.contrib.redirects",
+    "wagtail.embeds",
+    "wagtail.sites",
+    "wagtail.users",
+    "wagtail.snippets",
+    "wagtail.documents",
+    "wagtail.images",
+    "wagtail.search",
+    "wagtail.admin",
+    "wagtail",
+    "modelcluster",
+    "taggit",
     "flatlanders",
     "firehose",
 ]
@@ -64,6 +81,7 @@ MIDDLEWARE = [
     "django.contrib.auth.middleware.AuthenticationMiddleware",
     "django.contrib.messages.middleware.MessageMiddleware",
     "django.middleware.clickjacking.XFrameOptionsMiddleware",
+    "wagtail.contrib.redirects.middleware.RedirectMiddleware",
 ]
 
 ROOT_URLCONF = "sk_atp_feed.urls"
@@ -163,6 +181,14 @@ LOGGING = {
         "console": {
             "class": "logging.StreamHandler",
         },
+        "server": {
+            "class": "logging.FileHandler",
+            "filename": "server.log",
+        },
+        "index": {
+            "class": "logging.FileHandler",
+            "filename": "index.log",
+        },
     },
     "root": {
         "handlers": ["console"],
@@ -170,12 +196,12 @@ LOGGING = {
     },
     "loggers": {
         "django": {
-            "handlers": ["console"],
+            "handlers": ["console", "server"],
             "level": os.getenv("DJANGO_LOG_LEVEL", "INFO"),
             "propagate": False,
         },
         "feed": {
-            "handlers": ["console"],
+            "handlers": ["console", "index"],
             "level": os.getenv("FEEDGEN_LOG_LEVEL", "DEBUG"),
             "propagate": False,
         },
@@ -190,7 +216,13 @@ STATIC_ROOT = os.path.join(BASE_DIR, "staticfiles")
 STATICFILES_DIRS = [
     BASE_DIR / "static",
 ]
+
+MEDIA_ROOT = os.path.join(BASE_DIR, "media")
+MEDIA_URL = "/media/"
+
 # Default primary key field type
 # https://docs.djangoproject.com/en/4.1/ref/settings/#default-auto-field
 
 DEFAULT_AUTO_FIELD = "django.db.models.BigAutoField"
+
+WAGTAIL_SITE_NAME = os.getenv("WAGTAIL_SITE_NAME", "Flatlanders")
