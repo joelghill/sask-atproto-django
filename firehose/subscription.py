@@ -208,7 +208,13 @@ def _get_ops_by_type(
     return operation_by_type
 
 
-def process_queue(queue: Queue, stream_stop_event, client, state, operations_callback):
+def process_queue(
+    queue: Queue,
+    stream_stop_event,
+    client: FirehoseSubscribeReposClient,
+    state: SubscriptionState,
+    operations_callback,
+):
     logger.info("Starting subscription worker")
     while True:
         message: MessageFrame = queue.get()
@@ -229,19 +235,23 @@ def process_queue(queue: Queue, stream_stop_event, client, state, operations_cal
                 client.update_params(
                     models.ComAtprotoSyncSubscribeRepos.Params(cursor=commit.seq)
                 )
+                # save state every 20 frames
+                if commit.seq % 20 == 0:
+                    state.save()
+
             elif commit.seq < state.cursor:
-                # The feed has fallen behind, so we need to reset the cursor
+                # Need to stop, update cursor, and restart
                 logger.warning(
                     "Received commit with seq %s, but current cursor is %s",
                     commit.seq,
                     state.cursor,
                 )
+                client.stop()
                 client.update_params(
                     models.ComAtprotoSyncSubscribeRepos.Params(cursor=state.cursor)
                 )
-            # save state every 20 frames
-            if commit.seq % 20 == 0:
-                state.save()
+                client.start(operations_callback)
+                continue
 
             operations_callback(_get_ops_by_type(commit))
 
@@ -259,7 +269,7 @@ def run(name, operations_callback, stream_stop_event=None):
     client = FirehoseSubscribeReposClient(params=params)
 
     # Setup muti-processing
-    workers_count = 1  # Fix later
+    workers_count = 2  # Fix later
     # if workers_count > 8:
     #     workers_count = 8
     max_queue_size = 500
@@ -275,3 +285,5 @@ def run(name, operations_callback, stream_stop_event=None):
         queue.put(message)
 
     client.start(on_message_handler)
+    queue.close()
+    pool.close()
