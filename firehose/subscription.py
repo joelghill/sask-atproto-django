@@ -246,11 +246,9 @@ def process_queue(
                     commit.seq,
                     state.cursor,
                 )
-                client.stop()
                 client.update_params(
                     models.ComAtprotoSyncSubscribeRepos.Params(cursor=state.cursor)
                 )
-                client.start(operations_callback)
                 continue
 
             operations_callback(_get_ops_by_type(commit))
