@@ -9,7 +9,6 @@ from atproto.xrpc_client.models.app.bsky.feed.post import Main as MainPost
 from atproto.xrpc_client.models.app.bsky.feed.like import Main as MainLike
 from atproto.xrpc_client.models.app.bsky.feed.repost import Main as MainRepost
 from atproto.xrpc_client.models.app.bsky.graph.follow import Main as MainFollow
-from regex import E
 from firehose.subscription import CommitOperations, CreatedRecordOperation
 from flatlanders.models import Follow, Post, RegisteredUser
 from flatlanders.keywords import SASK_WORDS
