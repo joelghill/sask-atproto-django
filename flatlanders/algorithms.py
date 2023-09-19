@@ -1,6 +1,7 @@
 import logging
 
-from datetime import datetime, timedelta, timezone
+from datetime import datetime, timedelta
+from django.utils import timezone
 import re
 from typing import Iterable, List
 from django.db.models import F
@@ -8,6 +9,7 @@ from atproto.xrpc_client.models.app.bsky.feed.post import Main as MainPost
 from atproto.xrpc_client.models.app.bsky.feed.like import Main as MainLike
 from atproto.xrpc_client.models.app.bsky.feed.repost import Main as MainRepost
 from atproto.xrpc_client.models.app.bsky.graph.follow import Main as MainFollow
+from regex import E
 from firehose.subscription import CommitOperations, CreatedRecordOperation
 from flatlanders.models import Follow, Post, RegisteredUser
 from flatlanders.keywords import SASK_WORDS
@@ -23,31 +25,37 @@ class InvalidCursor(ValueError):
 
 def flatlanders_handler(limit: int = 50, cursor: str | None = None):
     """Return the feed skeleton for the flatlanders algorithm"""
-    indexed_at: datetime | None = None
-    if cursor:
-        logger.debug("Incoming cursor: %s", cursor)
-        (indexed_at_timestamp, cid) = cursor.split("::")
-        if not indexed_at_timestamp or not cid:
-            raise InvalidCursor(f"Malformed cursor: {cursor}")
+    try:
+        indexed_at: datetime | None = None
+        if cursor:
+            logger.debug("Incoming cursor: %s", cursor)
+            (indexed_at_timestamp, cid) = cursor.split("::")
+            if not indexed_at_timestamp or not cid:
+                raise InvalidCursor(f"Malformed cursor: {cursor}")
 
-        indexed_at = datetime.fromtimestamp(float(indexed_at_timestamp))
+            indexed_at = datetime.fromtimestamp(
+                float(indexed_at_timestamp), timezone.utc
+            )
 
-        posts = Post.objects.filter(created_at__lt=indexed_at).order_by(
-            "-created_at", "-indexed_at"
-        )[:limit]
-    else:
-        posts = Post.objects.order_by("-created_at", "-indexed_at")[:limit]
-
-    feed = [{"post": post.uri} for post in posts]
-
-    if posts:
-        last = list(posts)[-1]
-        if last.created_at:
-            cursor = f"{last.created_at.timestamp()}::{last.cid}"
+            posts = Post.objects.filter(created_at__lt=indexed_at).order_by(
+                "-created_at", "-indexed_at"
+            )[:limit]
         else:
-            cursor = f"{last.indexed_at.timestamp()}::{last.cid}"
+            posts = Post.objects.order_by("-created_at", "-indexed_at")[:limit]
 
-    logger.debug("Outgoing cursor: %s", cursor)
+        feed = [{"post": post.uri} for post in posts]
+
+        if posts:
+            last = list(posts)[-1]
+            if last.created_at:
+                cursor = f"{last.created_at.timestamp()}::{last.cid}"
+            else:
+                cursor = f"{last.indexed_at.timestamp()}::{last.cid}"
+
+        logger.debug("Outgoing cursor: %s", cursor)
+    except Exception as error:
+        logger.error("Error in flatlanders handler: %s", error, exc_info=True)
+        raise error
     return {
         "cursor": cursor,
         "feed": feed,
