@@ -226,7 +226,19 @@ def process_queue(queue: Queue, stream_stop_event, client, state, operations_cal
             # update state after every frame
             if commit.seq > state.cursor:
                 state.cursor = commit.seq
-                client.update_params(models.ComAtprotoSyncSubscribeRepos.Params(cursor=commit.seq))
+                client.update_params(
+                    models.ComAtprotoSyncSubscribeRepos.Params(cursor=commit.seq)
+                )
+            elif commit.seq < state.cursor:
+                # The feed has fallen behind, so we need to reset the cursor
+                logger.warning(
+                    "Received commit with seq %s, but current cursor is %s",
+                    commit.seq,
+                    state.cursor,
+                )
+                client.update_params(
+                    models.ComAtprotoSyncSubscribeRepos.Params(cursor=state.cursor)
+                )
             # save state every 20 frames
             if commit.seq % 20 == 0:
                 state.save()
