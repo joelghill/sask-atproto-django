@@ -113,11 +113,7 @@ def _process_created_posts(created_posts: Iterable[CreatedRecordOperation[MainPo
                 logger.debug("Creating new author: %s", post.author_did)
                 author = RegisteredUser.objects.create(did=post.author_did)
                 logger.info("New author registered: %s", author.did)
-            # If the author is not active, and the post is a sask post, extend their
-            # active status by 3 days and save the author
-            elif not author.is_registered():
-                author.extend(30)
-                author.save()
+
             logger.info("Indexing post from keyword match: %s", post.record_text)
             Post.from_post_record(post, is_sask_post, author)
 
