@@ -1,6 +1,7 @@
 from datetime import datetime
 import logging
-from multiprocessing import Pool, Queue, Lock, cpu_count
+from multiprocessing import Pool, Queue, Value, cpu_count
+from multiprocessing.synchronize import Event
 import typing as t
 
 from atproto import CAR, CID, AtUri, models
@@ -23,9 +24,6 @@ if t.TYPE_CHECKING:
 
 
 T = t.TypeVar("T", Post, Like, Repost, Follow)
-
-# Lock used for multiprocessing
-mutex = Lock()
 
 
 class CreatedRecordOperation(t.Generic[T]):
@@ -208,80 +206,62 @@ def _get_ops_by_type(
     return operation_by_type
 
 
-def process_queue(
-    queue: Queue,
-    stream_stop_event,
-    client: FirehoseSubscribeReposClient,
-    state: SubscriptionState,
-    operations_callback,
-):
+def process_queue(cursor_value, queue: Queue, operations_callback):
     logger.info("Starting subscription worker")
     while True:
         message: MessageFrame = queue.get()
         # stop on next message if requested
-        with mutex:
-            if stream_stop_event and stream_stop_event.is_set():
-                client.stop()
-                return
 
         commit = parse_subscribe_repos_message(message)
         if not isinstance(commit, models.ComAtprotoSyncSubscribeRepos.Commit):
             continue
 
-        with mutex:
-            # update state after every frame
-            if commit.seq > state.cursor:
-                state.cursor = commit.seq
-                client.update_params(
-                    models.ComAtprotoSyncSubscribeRepos.Params(cursor=commit.seq)
-                )
-                # save state every 20 frames
-                if commit.seq % 20 == 0:
-                    state.save()
+        if commit.seq > cursor_value.value:  # type: ignore
+            cursor_value.value = commit.seq
 
-            elif commit.seq < state.cursor:
-                # Need to stop, update cursor, and restart
-                logger.warning(
-                    "Received commit with seq %s, but current cursor is %s",
-                    commit.seq,
-                    state.cursor,
-                )
-                client.update_params(
-                    models.ComAtprotoSyncSubscribeRepos.Params(cursor=state.cursor)
-                )
-                continue
-
-            operations_callback(_get_ops_by_type(commit))
+        operations_callback(_get_ops_by_type(commit))
 
 
-def run(name, operations_callback, stream_stop_event=None):
+def get_firehose_params(cursor_value) -> models.ComAtprotoSyncSubscribeRepos.Params:
+    return models.ComAtprotoSyncSubscribeRepos.Params(cursor=cursor_value.value)
+
+
+def run(name, operations_callback, stream_stop_event: Event):
     # initialize client and state
-    state = SubscriptionState.objects.filter(service=name).first()
+    state, _ = SubscriptionState.objects.get_or_create(
+        service=name, defaults={"cursor": 0}
+    )
 
-    params = None
-    if state:
-        params = models.ComAtprotoSyncSubscribeRepos.Params(cursor=state.cursor)
-    else:
-        state = SubscriptionState.objects.create(service=name, cursor=0)
+    cursor = Value("i", state.cursor)
+    params = models.ComAtprotoSyncSubscribeRepos.Params(
+        cursor=state.cursor if state.cursor > 0 else None
+    )
 
-    client = FirehoseSubscribeReposClient(params=params)
+    client = FirehoseSubscribeReposClient(params)
 
-    # Setup muti-processing
-    workers_count = 2  # Fix later
-    # if workers_count > 8:
-    #     workers_count = 8
+    workers_count = 3  # cpu_count() * 2 - 1
     max_queue_size = 500
 
     queue = Queue(maxsize=max_queue_size)
     pool = Pool(
         workers_count,
         process_queue,
-        (queue, stream_stop_event, client, state, operations_callback),
+        (cursor, queue, operations_callback),
     )
 
     def on_message_handler(message: "MessageFrame") -> None:
+
+        if cursor.value:  # type: ignore
+            # we are using updating the cursor state here because of multiprocessing
+            # typically you can call client.update_params() directly on commit processing
+            client.update_params(get_firehose_params(cursor))
+
+            # If the current state has fallen at least 20 behind, update it
+            if state.cursor + 20 < cursor.value:  # type: ignore
+                state.cursor = cursor.value  # type: ignore
+                state.save()
+
         queue.put(message)
 
     client.start(on_message_handler)
-    queue.close()
-    pool.close()
+    logger.info("Subscription workers stopped")
