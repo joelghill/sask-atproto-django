@@ -225,7 +225,9 @@ def process_queue(cursor_value, queue: Queue, operations_callback):
         if commit.seq > cursor_value.value:  # type: ignore
             cursor_value.value = commit.seq
 
-        operations_callback(_get_ops_by_type(commit))
+        ops = _get_ops_by_type(commit)
+        with mutex:
+            operations_callback(ops)
 
 
 def get_firehose_params(cursor_value) -> models.ComAtprotoSyncSubscribeRepos.Params:
