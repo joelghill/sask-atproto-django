@@ -1,6 +1,6 @@
 from datetime import datetime
 import logging
-from multiprocessing import Pool, Queue, Value, cpu_count, Lock
+from multiprocessing import Pool, Queue, Value, cpu_count
 from multiprocessing.synchronize import Event
 import typing as t
 
@@ -27,7 +27,6 @@ if t.TYPE_CHECKING:
 
 T = t.TypeVar("T", UnknownRecordType, DotDict)
 
-mutex = Lock()
 
 class CreatedRecordOperation(t.Generic[T]):
     """Represents a record that was created in a user's repo."""
@@ -226,8 +225,7 @@ def process_queue(cursor_value, queue: Queue, operations_callback):
             cursor_value.value = commit.seq
 
         ops = _get_ops_by_type(commit)
-        with mutex:
-            operations_callback(ops)
+        operations_callback(ops)
 
 
 def get_firehose_params(cursor_value) -> models.ComAtprotoSyncSubscribeRepos.Params:
@@ -247,7 +245,7 @@ def run(name, operations_callback, stream_stop_event: Event):
 
     client = FirehoseSubscribeReposClient(params)
 
-    workers_count = 3 #cpu_count() * 2 - 1
+    workers_count = 3  # cpu_count() * 2 - 1
     max_queue_size = 500
 
     queue = Queue(maxsize=max_queue_size)
@@ -264,10 +262,8 @@ def run(name, operations_callback, stream_stop_event: Event):
             client.update_params(get_firehose_params(cursor))
 
             # If the current state has fallen at least 20 behind, update it
-            with mutex:
-                if state.cursor + 20 < cursor.value:  # type: ignore
-                    state.cursor = cursor.value  # type: ignore
-                    state.save()
+            if cursor.value % 20 == 0:  # type: ignore
+                SubscriptionState.objects.filter(service=name).update(cursor=cursor.value)  # type: ignore
 
         queue.put(message)
 
