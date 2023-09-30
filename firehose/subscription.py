@@ -6,6 +6,8 @@ import typing as t
 
 from atproto import CAR, CID, AtUri, models
 from atproto.firehose import FirehoseSubscribeReposClient, parse_subscribe_repos_message
+from atproto.xrpc_client.models.dot_dict import DotDict
+from atproto.xrpc_client.models.unknown_type import UnknownRecordType
 from atproto.xrpc_client.models.utils import get_or_create, is_record_type
 from atproto.xrpc_client.models.app.bsky.feed.post import Main as Post
 from atproto.xrpc_client.models.app.bsky.feed.like import Main as Like
@@ -23,18 +25,18 @@ if t.TYPE_CHECKING:
     from atproto.firehose import MessageFrame
 
 
-T = t.TypeVar("T", Post, Like, Repost, Follow)
+T = t.TypeVar("T", UnknownRecordType, DotDict)
 
 
 class CreatedRecordOperation(t.Generic[T]):
     """Represents a record that was created in a user's repo."""
 
-    record: T | dict
+    record: T
     uri: str
     cid: CID
     author_did: str
 
-    def __init__(self, record: T | dict, uri: str, cid: CID, author: str) -> None:
+    def __init__(self, record: T, uri: str, cid: CID, author: str) -> None:
         self.record = record
         self.uri = uri
         self.cid = cid
@@ -43,17 +45,17 @@ class CreatedRecordOperation(t.Generic[T]):
     @property
     def record_created_at(self) -> datetime:
         """Returns the created_at date of the record."""
-        datetime_value = ""
-        if isinstance(self.record, dict):
-            datetime_value = self.record.get("created_at", "")
-        else:
-            datetime_value = self.record.created_at
+        # If the record does not have a created_at field, return the current time
+        if not hasattr(self.record, "created_at"):
+            return timezone.now()
+
+        datetime_value = self.record.created_at
         try:
             # Convert to date if string
             if datetime_value and isinstance(datetime_value, str):
                 return datetime.fromisoformat(datetime_value)
             elif datetime_value and isinstance(datetime_value, datetime):
-                return datetime_value
+                return datetime_value  # TODO: It should be a string.
             else:
                 return timezone.now()
 
@@ -163,6 +165,9 @@ def _get_ops_by_type(
                 continue
 
             record = get_or_create(record_raw_data, strict=False)
+            if record is None:
+                continue
+
             if uri.collection == models.ids.AppBskyFeedLike and is_record_type(
                 record, models.AppBskyFeedLike
             ):
@@ -239,7 +244,7 @@ def run(name, operations_callback, stream_stop_event: Event):
 
     client = FirehoseSubscribeReposClient(params)
 
-    workers_count = 3  # cpu_count() * 2 - 1
+    workers_count = 3 #cpu_count() * 2 - 1
     max_queue_size = 500
 
     queue = Queue(maxsize=max_queue_size)
@@ -250,7 +255,6 @@ def run(name, operations_callback, stream_stop_event: Event):
     )
 
     def on_message_handler(message: "MessageFrame") -> None:
-
         if cursor.value:  # type: ignore
             # we are using updating the cursor state here because of multiprocessing
             # typically you can call client.update_params() directly on commit processing
