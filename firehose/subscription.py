@@ -1,6 +1,6 @@
 from datetime import datetime
 import logging
-from multiprocessing import Pool, Queue, Value, cpu_count
+from multiprocessing import Pool, Queue, Value, cpu_count, Lock
 from multiprocessing.synchronize import Event
 import typing as t
 
@@ -27,6 +27,7 @@ if t.TYPE_CHECKING:
 
 T = t.TypeVar("T", UnknownRecordType, DotDict)
 
+mutex = Lock()
 
 class CreatedRecordOperation(t.Generic[T]):
     """Represents a record that was created in a user's repo."""
@@ -261,9 +262,10 @@ def run(name, operations_callback, stream_stop_event: Event):
             client.update_params(get_firehose_params(cursor))
 
             # If the current state has fallen at least 20 behind, update it
-            if state.cursor + 20 < cursor.value:  # type: ignore
-                state.cursor = cursor.value  # type: ignore
-                state.save()
+            with mutex:
+                if state.cursor + 20 < cursor.value:  # type: ignore
+                    state.cursor = cursor.value  # type: ignore
+                    state.save()
 
         queue.put(message)
 
