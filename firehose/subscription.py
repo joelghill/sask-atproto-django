@@ -262,8 +262,8 @@ def run(name, operations_callback, stream_stop_event: Event):
             client.update_params(get_firehose_params(cursor))
 
             # If the current state has fallen at least 20 behind, update it
-            if cursor.value % 20 == 0:  # type: ignore
-                SubscriptionState.objects.filter(service=name).update(cursor=cursor.value)  # type: ignore
+            # if cursor.value % 20 == 0:  # type: ignore
+            #     SubscriptionState.objects.filter(service=name).update(cursor=cursor.value)  # type: ignore
 
         queue.put(message)
 
