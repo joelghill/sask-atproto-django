@@ -11,7 +11,7 @@
             "program": "${workspaceFolder}/manage.py",
             "args": [
                 "start_feed",
-                "wss://bsky.social",
+                "wss://bsky.network/xrpc",
                 "--algorithm=logger"
             ],
             "django": true,
@@ -24,7 +24,7 @@
             "program": "${workspaceFolder}/manage.py",
             "args": [
                 "start_feed",
-                "wss://bsky.social",
+                "wss://bsky.network/xrpc",
                 "--algorithm=flatlanders"
             ],
             "django": true,
