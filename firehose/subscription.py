@@ -232,10 +232,10 @@ def get_firehose_params(cursor_value) -> models.ComAtprotoSyncSubscribeRepos.Par
     return models.ComAtprotoSyncSubscribeRepos.Params(cursor=cursor_value.value)
 
 
-def run(name, operations_callback, stream_stop_event: Event):
+def run(base_uri, operations_callback, stream_stop_event: Event):
     # initialize client and state
     state, _ = SubscriptionState.objects.get_or_create(
-        service=name, defaults={"cursor": 0}
+        service=base_uri, defaults={"cursor": 0}
     )
 
     cursor = Value("i", state.cursor)
@@ -243,7 +243,7 @@ def run(name, operations_callback, stream_stop_event: Event):
         cursor=state.cursor if state.cursor > 0 else None
     )
 
-    client = FirehoseSubscribeReposClient(params)
+    client = FirehoseSubscribeReposClient(params, base_uri=base_uri)
 
     workers_count = 3  # cpu_count() * 2 - 1
     max_queue_size = 500
