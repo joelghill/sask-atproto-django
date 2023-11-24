@@ -36,12 +36,13 @@ DEBUG = os.getenv("DJANGO_DEBUG", "TRUE").upper() == "TRUE"
 # SECURITY WARNING: don't run with dev mode turned on in production!
 DEVELOPMENT_MODE = os.getenv("DJANGO_DEVELOPMENT_MODE", "TRUE").upper() == "TRUE"
 
-ALLOWED_HOSTS = os.getenv("DJANGO_ALLOWED_HOSTS", "0.0.0.0,127.0.0.1,localhost").split(",")
+ALLOWED_HOSTS = os.getenv("DJANGO_ALLOWED_HOSTS", "0.0.0.0,127.0.0.1,localhost").split(
+    ","
+)
 
-CSRF_TRUSTED_ORIGINS = os.getenv("DJANGO_CSRF_TRUSTED_ORIGINS", "http://localhost").split(",")
-
-USE_TZ = True
-TIME_ZONE = "UTC"
+CSRF_TRUSTED_ORIGINS = os.getenv(
+    "DJANGO_CSRF_TRUSTED_ORIGINS", "http://localhost"
+).split(",")
 
 # Application definition
 
@@ -111,9 +112,13 @@ else:
             "PASSWORD": FEEDGEN_DB_PASSWORD,
             "HOST": FEEDGEN_DB_HOST,
             "PORT": FEEDGEN_DB_PORT,
+            "CONN_MAX_AGE": None,
+            "CONN_HEALTH_CHECKS": True,
             "OPTIONS": {
                 "sslmode": FEEDGEN_DB_SSL_MODE,
                 "sslrootcert": FEEDGEN_DB_SSL_CERT,
+                "client_encoding": "UTF8",
+                "default_transaction_isolation": "read committed"
             },
         }
     }
