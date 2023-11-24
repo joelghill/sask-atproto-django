@@ -274,9 +274,9 @@ def run(base_uri, operations_callback, stream_stop_event: Event):
             client.update_params(get_firehose_params(cursor))
 
             # If the current state has fallen at least 100 behind, update it
-            # if cursor.value % 100 == 0:  # type: ignore
-                # state.cursor =cursor.value  # type: ignore
-                # state.save()
+            if cursor.value % 100 == 0:  # type: ignore
+                state.cursor =cursor.value  # type: ignore
+                state.save()
 
         queue.put(message)
 
