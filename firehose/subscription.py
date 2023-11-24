@@ -149,7 +149,7 @@ def _get_ops_by_type(
         commit.blocks = commit.blocks.encode()
     try:
         car = CAR.from_bytes(commit.blocks)
-    except BaseException: # pylint: disable=broad-except
+    except BaseException:  # pylint: disable=broad-except
         logger.exception("Failed to parse CAR")
         return operation_by_type
 
@@ -219,9 +219,13 @@ def process_queue(cursor_value, queue: Queue, operations_callback):
     logger.info("Starting subscription worker")
     while True:
         message: MessageFrame = queue.get()
-        # stop on next message if requested
 
-        commit = parse_subscribe_repos_message(message)
+        try:
+            commit = parse_subscribe_repos_message(message)
+        except Exception as e:  # pylint: disable=broad-except
+            logger.exception("Failed to parse message: %s", e)
+            continue
+
         if (
             not isinstance(commit, models.ComAtprotoSyncSubscribeRepos.Commit)
             or not commit.blocks
