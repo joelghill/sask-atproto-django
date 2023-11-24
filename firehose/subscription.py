@@ -1,8 +1,9 @@
+from calendar import c
 from datetime import datetime
 import logging
 from multiprocessing import Pool, Queue, Value, cpu_count
 from multiprocessing.synchronize import Event
-import stat
+
 import typing as t
 
 from atproto import CAR, CID, AtUri, models
@@ -16,6 +17,7 @@ from atproto.xrpc_client.models.app.bsky.feed.repost import Main as Repost
 from atproto.xrpc_client.models.app.bsky.graph.follow import Main as Follow
 
 from django.utils import timezone
+from django.db import close_old_connections, connection
 
 from firehose.models import SubscriptionState
 
@@ -224,7 +226,7 @@ def process_queue(cursor_value, queue: Queue, operations_callback):
         try:
             commit = parse_subscribe_repos_message(message)
         except Exception as e:  # pylint: disable=broad-except
-            logger.exception("Failed to parse message: %s", e)
+            logger.exception("Failed to parse message: %s", str(message))
             continue
 
         if (
@@ -268,6 +270,7 @@ def run(base_uri, operations_callback, stream_stop_event: Event):
     )
 
     def on_message_handler(message: "MessageFrame") -> None:
+
         if cursor.value:  # type: ignore
             # we are using updating the cursor state here because of multiprocessing
             # typically you can call client.update_params() directly on commit processing
@@ -275,7 +278,9 @@ def run(base_uri, operations_callback, stream_stop_event: Event):
 
             # If the current state has fallen at least 100 behind, update it
             if cursor.value % 100 == 0:  # type: ignore
-                state.cursor =cursor.value  # type: ignore
+                # Close old connecitons that cannot be used anymore
+                close_old_connections()
+                state.cursor = cursor.value  # type: ignore
                 state.save()
 
         queue.put(message)
