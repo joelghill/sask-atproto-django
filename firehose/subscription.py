@@ -147,8 +147,12 @@ def _get_ops_by_type(
     # if commit is string, convert to bytes
     if isinstance(commit.blocks, str):
         commit.blocks = commit.blocks.encode()
+    try:
+        car = CAR.from_bytes(commit.blocks)
+    except BaseException: # pylint: disable=broad-except
+        logger.exception("Failed to parse CAR")
+        return operation_by_type
 
-    car = CAR.from_bytes(commit.blocks)
     for op in commit.ops:
         uri = AtUri.from_str(f"at://{commit.repo}/{op.path}")
 
@@ -218,7 +222,10 @@ def process_queue(cursor_value, queue: Queue, operations_callback):
         # stop on next message if requested
 
         commit = parse_subscribe_repos_message(message)
-        if not isinstance(commit, models.ComAtprotoSyncSubscribeRepos.Commit):
+        if (
+            not isinstance(commit, models.ComAtprotoSyncSubscribeRepos.Commit)
+            or not commit.blocks
+        ):
             continue
 
         if commit.seq > cursor_value.value:  # type: ignore
