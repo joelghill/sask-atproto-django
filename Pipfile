@@ -6,10 +6,11 @@ name = "pypi"
 [packages]
 django = "*"
 gunicorn = "*"
-psycopg2-binary = "*"
+psycopg = "*"
 dj-database-url = "*"
 atproto = "*"
 python-dotenv = "*"
+pydantic = "==2.4.*"
 
 [dev-packages]
 djlint = "*"
