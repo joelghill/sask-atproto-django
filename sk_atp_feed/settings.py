@@ -118,7 +118,6 @@ else:
                 "sslmode": FEEDGEN_DB_SSL_MODE,
                 "sslrootcert": FEEDGEN_DB_SSL_CERT,
                 "client_encoding": "UTF8",
-                "default_transaction_isolation": "read committed"
             },
         }
     }
