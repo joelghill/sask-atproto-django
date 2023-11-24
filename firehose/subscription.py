@@ -2,6 +2,7 @@ from datetime import datetime
 import logging
 from multiprocessing import Pool, Queue, Value, cpu_count
 from multiprocessing.synchronize import Event
+import stat
 import typing as t
 
 from atproto import CAR, CID, AtUri, models
@@ -273,8 +274,9 @@ def run(base_uri, operations_callback, stream_stop_event: Event):
             client.update_params(get_firehose_params(cursor))
 
             # If the current state has fallen at least 100 behind, update it
-            if cursor.value % 100 == 0:  # type: ignore
-                SubscriptionState.objects.filter(service=base_uri).update(cursor=cursor.value)  # type: ignore
+            # if cursor.value % 100 == 0:  # type: ignore
+                # state.cursor =cursor.value  # type: ignore
+                # state.save()
 
         queue.put(message)
 
