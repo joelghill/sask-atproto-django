@@ -259,7 +259,7 @@ def run(base_uri, operations_callback, stream_stop_event: Event):
     workers_count = 3  # cpu_count() * 2 - 1
     max_queue_size = 500
 
-    queue = Queue(maxsize=max_queue_size)
+    queue: Queue = Queue(maxsize=max_queue_size)
     pool = Pool(
         workers_count,
         process_queue,
@@ -272,9 +272,9 @@ def run(base_uri, operations_callback, stream_stop_event: Event):
             # typically you can call client.update_params() directly on commit processing
             client.update_params(get_firehose_params(cursor))
 
-            # If the current state has fallen at least 20 behind, update it
-            # if cursor.value % 20 == 0:  # type: ignore
-            #     SubscriptionState.objects.filter(service=name).update(cursor=cursor.value)  # type: ignore
+            # If the current state has fallen at least 100 behind, update it
+            if cursor.value % 100 == 0:  # type: ignore
+                SubscriptionState.objects.filter(service=base_uri).update(cursor=cursor.value)  # type: ignore
 
         queue.put(message)
 
