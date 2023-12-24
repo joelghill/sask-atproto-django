@@ -3,11 +3,11 @@ from atproto import CID
 from django.utils import timezone
 
 import pytest
-from atproto.xrpc_client.models.app.bsky.feed.post import Main as MainPost
-from atproto.xrpc_client.models.app.bsky.feed.like import Main as MainLike
-from atproto.xrpc_client.models.app.bsky.feed.repost import Main as MainRepost
-from atproto.xrpc_client.models.app.bsky.graph.follow import Main as MainFollow
-from atproto.xrpc_client.models.com.atproto.repo.strong_ref import Main as MainStrongRef
+from atproto_client.models.app.bsky.feed.post import Main as MainPost
+from atproto_client.models.app.bsky.feed.like import Main as MainLike
+from atproto_client.models.app.bsky.feed.repost import Main as MainRepost
+from atproto_client.models.app.bsky.graph.follow import Main as MainFollow
+from atproto_client.models.com.atproto.repo.strong_ref import Main as MainStrongRef
 from firehose.subscription import (
     CommitOperations,
     CreatedRecordOperation,

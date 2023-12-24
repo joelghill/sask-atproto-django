@@ -5,10 +5,10 @@ from django.utils import timezone
 import re
 from typing import Iterable, List
 from django.db.models import F
-from atproto.xrpc_client.models.app.bsky.feed.post import Main as MainPost
-from atproto.xrpc_client.models.app.bsky.feed.like import Main as MainLike
-from atproto.xrpc_client.models.app.bsky.feed.repost import Main as MainRepost
-from atproto.xrpc_client.models.app.bsky.graph.follow import Main as MainFollow
+from atproto_client.models.app.bsky.feed.post import Main as MainPost
+from atproto_client.models.app.bsky.feed.like import Main as MainLike
+from atproto_client.models.app.bsky.feed.repost import Main as MainRepost
+from atproto_client.models.app.bsky.graph.follow import Main as MainFollow
 from firehose.subscription import CommitOperations, CreatedRecordOperation
 from flatlanders.models import Follow, Post, RegisteredUser
 from flatlanders.keywords import SASK_WORDS

@@ -2,19 +2,22 @@ from calendar import c
 from datetime import datetime
 import logging
 from multiprocessing import Pool, Queue, Value, cpu_count
+from multiprocessing.sharedctypes import SynchronizedBase
 from multiprocessing.synchronize import Event
 
 import typing as t
 
 from atproto import CAR, CID, AtUri, models
-from atproto.firehose import FirehoseSubscribeReposClient, parse_subscribe_repos_message
-from atproto.xrpc_client.models.dot_dict import DotDict
-from atproto.xrpc_client.models.unknown_type import UnknownRecordType
-from atproto.xrpc_client.models.utils import get_or_create, is_record_type
-from atproto.xrpc_client.models.app.bsky.feed.post import Main as Post
-from atproto.xrpc_client.models.app.bsky.feed.like import Main as Like
-from atproto.xrpc_client.models.app.bsky.feed.repost import Main as Repost
-from atproto.xrpc_client.models.app.bsky.graph.follow import Main as Follow
+from atproto import FirehoseSubscribeReposClient, parse_subscribe_repos_message
+from atproto_client.models.unknown_type import UnknownRecordType
+from atproto_client.models.dot_dict import DotDict
+
+from atproto_client.models.utils import get_or_create, is_record_type
+from atproto_client.models.app.bsky.feed.post import Main as Post
+from atproto_client.models.app.bsky.feed.like import Main as Like
+from atproto_client.models.app.bsky.feed.repost import Main as Repost
+from atproto_client.models.app.bsky.graph.follow import Main as Follow
+from django import db
 
 from django.utils import timezone
 from django.db import close_old_connections, connection
@@ -25,7 +28,7 @@ logger = logging.getLogger("feed")
 
 
 if t.TYPE_CHECKING:
-    from atproto.firehose import MessageFrame
+    from atproto_firehose.models import MessageFrame
 
 
 T = t.TypeVar("T", UnknownRecordType, DotDict)
@@ -218,14 +221,19 @@ def _get_ops_by_type(
     return operation_by_type
 
 
-def process_queue(cursor_value, queue: Queue, operations_callback):
+def process_queue(
+    base_uri: str,
+    cursor_value: SynchronizedBase,
+    queue: Queue,
+    operations_callback,
+):
     logger.info("Starting subscription worker")
     while True:
         message: MessageFrame = queue.get()
 
         try:
             commit = parse_subscribe_repos_message(message)
-        except Exception as e:  # pylint: disable=broad-except
+        except Exception:  # pylint: disable=broad-except
             logger.exception("Failed to parse message: %s", str(message))
             continue
 
@@ -236,7 +244,10 @@ def process_queue(cursor_value, queue: Queue, operations_callback):
             continue
 
         if commit.seq > cursor_value.value:  # type: ignore
-            cursor_value.value = commit.seq
+            cursor_value.value = commit.seq  # type: ignore
+            # If the current state has fallen at least 100 behind, update it
+            if cursor_value.value % 100 == 0:  # type: ignore
+                SubscriptionState.objects.update_or_create(service=base_uri, defaults={"cursor": cursor_value.value})  # type: ignore
 
         ops = _get_ops_by_type(commit)
         operations_callback(ops)
@@ -263,25 +274,20 @@ def run(base_uri, operations_callback, stream_stop_event: Event):
     max_queue_size = 500
 
     queue: Queue = Queue(maxsize=max_queue_size)
+
+    db.connections.close_all()
+
     pool = Pool(
         workers_count,
         process_queue,
-        (cursor, queue, operations_callback),
+        (base_uri, cursor, queue, operations_callback),
     )
 
     def on_message_handler(message: "MessageFrame") -> None:
-
         if cursor.value:  # type: ignore
             # we are using updating the cursor state here because of multiprocessing
             # typically you can call client.update_params() directly on commit processing
             client.update_params(get_firehose_params(cursor))
-
-            # If the current state has fallen at least 100 behind, update it
-            # if cursor.value % 100 == 0:  # type: ignore
-            #     # Close old connecitons that cannot be used anymore
-            #     close_old_connections()
-            #     state.cursor = cursor.value  # type: ignore
-            #     state.save()
 
         queue.put(message)
 

@@ -3,7 +3,7 @@ import logging
 from datetime import timedelta
 from django.db import IntegrityError, models
 from django.utils import timezone
-from atproto.xrpc_client.models.app.bsky.feed.post import Main as MainPost
+from atproto_client.models.app.bsky.feed.post import Main as MainPost
 
 from firehose.subscription import CreatedRecordOperation
 
