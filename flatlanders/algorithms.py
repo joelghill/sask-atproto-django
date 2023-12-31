@@ -1,7 +1,6 @@
 import logging
 
-from datetime import datetime, timedelta
-from django.utils import timezone
+from datetime import datetime, timedelta, timezone
 import re
 from typing import Iterable, List
 from django.db.models import F
