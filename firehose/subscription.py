@@ -1,27 +1,29 @@
-from calendar import c
-from datetime import datetime
 import logging
-from multiprocessing import Pool, Queue, Value, cpu_count
+import typing as t
+from datetime import datetime
+from multiprocessing import Pool, Queue, Value
 from multiprocessing.sharedctypes import SynchronizedBase
 from multiprocessing.synchronize import Event
 
-import typing as t
-
-from atproto import CAR, CID, AtUri, models
-from atproto import FirehoseSubscribeReposClient, parse_subscribe_repos_message
-from atproto_client.models.unknown_type import UnknownRecordType
+from atproto import (
+    CAR,
+    CID,
+    AtUri,
+    FirehoseSubscribeReposClient,
+    models,
+    parse_subscribe_repos_message,
+)
+from atproto_client.models.app.bsky.feed.like import Record as Like
+from atproto_client.models.app.bsky.feed.post import Record as Post
+from atproto_client.models.app.bsky.feed.repost import Record as Repost
+from atproto_client.models.app.bsky.graph.follow import Record as Follow
 from atproto_client.models.dot_dict import DotDict
-
+from atproto_client.models.unknown_type import UnknownRecordType
 from atproto_client.models.utils import get_or_create, is_record_type
-from atproto_client.models.app.bsky.feed.post import Main as Post
-from atproto_client.models.app.bsky.feed.like import Main as Like
-from atproto_client.models.app.bsky.feed.repost import Main as Repost
-from atproto_client.models.app.bsky.graph.follow import Main as Follow
 from django import db
-
 from django.utils import timezone
-from django.db import close_old_connections, connection
 
+from firehose import settings
 from firehose.models import SubscriptionState
 
 logger = logging.getLogger("feed")
@@ -270,7 +272,7 @@ def run(base_uri, operations_callback, stream_stop_event: Event):
 
     client = FirehoseSubscribeReposClient(params, base_uri=base_uri)
 
-    workers_count = 3  # cpu_count() * 2 - 1
+    workers_count = settings.FIREHOSE_WORKERS_COUNT
     max_queue_size = 500
 
     queue: Queue = Queue(maxsize=max_queue_size)

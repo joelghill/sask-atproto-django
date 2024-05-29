@@ -12,10 +12,11 @@ https://docs.djangoproject.com/en/4.1/ref/settings/
 
 import os
 from pathlib import Path
+
 from django.core.management.utils import get_random_secret_key
 from dotenv import load_dotenv
-from flatlanders.settings import *  # noqa: F403, F401
 
+from flatlanders.settings import *  # noqa: F403, F401
 
 load_dotenv()
 
@@ -195,7 +196,7 @@ LOGGING = {
 }
 
 # Static files (CSS, JavaScript, Images)
-# https://docs.djangoproject.com/en/4.1/howto/static-files/
+# https://docs.djangoproject.com/en/4.1/howto/static-files/RUN ./.venv/bin/python manage.py collectstatic --noinput
 
 STATIC_URL = "/static/"
 STATIC_ROOT = os.path.join(BASE_DIR, "staticfiles")

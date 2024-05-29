@@ -1,7 +1,6 @@
-from django.http import JsonResponse, HttpResponse
-from django.views import View
-
 from django.conf import settings
+from django.http import HttpResponse, JsonResponse
+from django.views import View
 
 from flatlanders.algorithms import ALGORITHMS
 

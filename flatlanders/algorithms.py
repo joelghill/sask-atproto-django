@@ -1,18 +1,18 @@
 import logging
-
-from datetime import datetime, timedelta, timezone
 import re
+from datetime import datetime, timedelta, timezone
 from typing import Iterable, List
-from django.db.models import F
-from atproto_client.models.app.bsky.feed.post import Main as MainPost
-from atproto_client.models.app.bsky.feed.like import Main as MainLike
-from atproto_client.models.app.bsky.feed.repost import Main as MainRepost
-from atproto_client.models.app.bsky.graph.follow import Main as MainFollow
-from firehose.subscription import CommitOperations, CreatedRecordOperation
-from flatlanders.models import Follow, Post, RegisteredUser
-from flatlanders.keywords import SASK_WORDS
-from flatlanders.settings import FEEDGEN_ADMIN_DID, FEEDGEN_URI
 
+from atproto_client.models.app.bsky.feed.like import Record as MainLike
+from atproto_client.models.app.bsky.feed.post import Record as MainPost
+from atproto_client.models.app.bsky.feed.repost import Record as MainRepost
+from atproto_client.models.app.bsky.graph.follow import Record as MainFollow
+from django.db.models import F
+
+from firehose.subscription import CommitOperations, CreatedRecordOperation
+from flatlanders.keywords import SASK_WORDS
+from flatlanders.models import Follow, Post, RegisteredUser
+from flatlanders.settings import FEEDGEN_ADMIN_DID, FEEDGEN_URI
 
 logger = logging.getLogger("feed")
 
@@ -73,11 +73,6 @@ def index_commit_operations(commits: CommitOperations):
     _process_created_posts(commits.posts.created)
     _process_deleted_posts(commits.posts.deleted)
 
-    # _process_created_likes(commits.likes.created)
-    # _process_deleted_likes(commits.likes.deleted)
-
-    # _process_created_reposts(commits.reposts.created)
-    # _process_deleted_reposts(commits.reposts.deleted)
     _process_created_follows(commits.follows.created)
     _process_deleted_follows(commits.follows.deleted)
 
@@ -113,7 +108,7 @@ def _process_created_posts(created_posts: Iterable[CreatedRecordOperation[MainPo
                 author = RegisteredUser.objects.create(did=post.author_did)
                 logger.info("New author registered: %s", author.did)
 
-            logger.info("Indexing post from keyword match: %s", post.record_text)
+            logger.info("Indexing post from keyword match")
             Post.from_post_record(post, is_sask_post, author)
 
         elif author and author.is_active():
@@ -132,32 +127,6 @@ def _process_deleted_posts(uris: List[str]):
     """Deletes a post from the database"""
     if uris:
         Post.objects.filter(uri__in=uris).delete()
-
-
-def _process_created_likes(like_operations: List[CreatedRecordOperation[MainLike]]):
-    """Increments the likes of a post from the database"""
-    uris = [like.record_subject_uri for like in like_operations]
-    if uris:
-        Post.objects.filter(uri__in=uris).update(likes=F("likes") + 1)
-
-
-def _process_deleted_likes(uris: List[str]):
-    """Removes a like from a post from the database"""
-    if uris:
-        Post.objects.filter(uri__in=uris).update(likes=F("likes") - 1)
-
-
-def _process_created_reposts(reposts: List[CreatedRecordOperation[MainRepost]]):
-    """Increments the reposts of a post from the database"""
-    uris = [repost.record_subject_uri for repost in reposts]
-    if uris:
-        Post.objects.filter(uri__in=uris).update(reposts=F("reposts") + 1)
-
-
-def _process_deleted_reposts(uris: List[str]):
-    """Removes a repost from a post from the database"""
-    if uris:
-        Post.objects.filter(uri__in=uris).update(reposts=F("reposts") - 1)
 
 
 def _process_created_follows(follows: List[CreatedRecordOperation[MainFollow]]):
