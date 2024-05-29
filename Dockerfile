@@ -23,6 +23,8 @@ COPY --from=build --chown=flatlander /app/.venv/ /app/.venv/
 COPY --chown=flatlander . /app/
 WORKDIR /app
 
+RUN ./.venv/bin/python manage.py collectstatic --noinput
+
 RUN chown flatlander /app
 RUN chown flatlander /app/.venv
 
