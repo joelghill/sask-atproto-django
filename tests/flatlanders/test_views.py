@@ -1,10 +1,8 @@
-from datetime import datetime
-from unittest.mock import MagicMock
-
 import pytest
-from flatlanders.algorithms import flatlanders_handler
-from flatlanders.models import Post, RegisteredUser
 from django.utils import timezone
+
+from flatlanders.algorithms import flatlanders_handler
+from flatlanders.models.posts import Post, RegisteredUser
 
 
 @pytest.mark.django_db

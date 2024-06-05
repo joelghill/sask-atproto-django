@@ -3,22 +3,17 @@ import re
 from datetime import datetime, timedelta, timezone
 from typing import Iterable, List
 
-from atproto_client.models.app.bsky.feed.like import Record as MainLike
 from atproto_client.models.app.bsky.feed.post import Record as MainPost
-from atproto_client.models.app.bsky.feed.repost import Record as MainRepost
 from atproto_client.models.app.bsky.graph.follow import Record as MainFollow
-from django.db.models import F
 
 from firehose.subscription import CommitOperations, CreatedRecordOperation
+from flatlanders.algorithms.errors import InvalidCursorError
 from flatlanders.keywords import SASK_WORDS
-from flatlanders.models import Follow, Post, RegisteredUser
+from flatlanders.models.posts import Follow, Post
+from flatlanders.models.users import RegisteredUser
 from flatlanders.settings import FEEDGEN_ADMIN_DID, FEEDGEN_URI
 
 logger = logging.getLogger("feed")
-
-
-class InvalidCursor(ValueError):
-    """Raised when the cursor is malformed"""
 
 
 def flatlanders_handler(limit: int = 50, cursor: str | None = None):
@@ -29,7 +24,7 @@ def flatlanders_handler(limit: int = 50, cursor: str | None = None):
             logger.debug("Incoming cursor: %s", cursor)
             (indexed_at_timestamp, cid) = cursor.split("::")
             if not indexed_at_timestamp or not cid:
-                raise InvalidCursor(f"Malformed cursor: {cursor}")
+                raise InvalidCursorError(f"Malformed cursor: {cursor}")
 
             indexed_at = datetime.fromtimestamp(
                 float(indexed_at_timestamp), timezone.utc

@@ -4,6 +4,7 @@ from django.contrib import admin
 # Register The subscription state here
 from .models import SubscriptionState
 
+
 class SubscriptionStateAdmin(admin.ModelAdmin):
     """ Admin class for SubscriptionState
     """

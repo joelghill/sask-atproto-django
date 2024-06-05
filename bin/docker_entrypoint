@@ -4,14 +4,17 @@ set -e
 
 start_server() {
     echo "Starting server..."
-    /app/.venv/bin/python manage.py migrate
     exec /app/.venv/bin/gunicorn -c gunicorn.conf.py sk_atp_feed.wsgi
 }
 
 start_indexer() {
     echo "Starting indexer..."
-    /app/.venv/bin/python manage.py migrate 
     exec /app/.venv/bin/python manage.py start_feed "wss://bsky.network/xrpc" --algorithm=flatlanders
+}
+
+start_labeler() {
+    echo "Starting labeler..."
+    exec /app/.venv/bin/python manage.py start_labeler
 }
 
 start_nginx() {
@@ -29,8 +32,11 @@ server)
 indexer)
     start_indexer
     ;;
+labeler)
+    start_labeler
+    ;;
 *)
-    echo "Usage: $0 {server|indexer|nginx}"
+    echo "Usage: $0 {server|indexer|labeler|nginx}"
     exit 1
     ;;
 esac

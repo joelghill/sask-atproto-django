@@ -2,11 +2,11 @@ import logging
 import signal
 import sys
 import threading
+
 from django.core.management.base import BaseCommand
 
 from firehose.subscription import CommitOperations, run
-from flatlanders.algorithms import index_commit_operations
-
+from flatlanders.algorithms.flatlanders_feed import index_commit_operations
 
 logger = logging.getLogger("feed")
 stream_stop_event = threading.Event()

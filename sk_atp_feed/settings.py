@@ -192,6 +192,11 @@ LOGGING = {
             "level": os.getenv("FEEDGEN_LOG_LEVEL", "DEBUG"),
             "propagate": False,
         },
+        "labeler": {
+            "handlers": ["console", "index"],
+            "level": os.getenv("labeler_LOG_LEVEL", "DEBUG"),
+            "propagate": False,
+        },
     },
 }
 
