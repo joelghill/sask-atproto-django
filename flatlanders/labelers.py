@@ -78,7 +78,7 @@ def run(reset: bool = False):
     )
 
     # Reset the cursor state if requested
-    if reset:
+    if reset or cursor_state.cursor is None:
         cursor_state.cursor = datetime.min
 
     while True:
