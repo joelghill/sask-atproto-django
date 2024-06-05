@@ -1,5 +1,7 @@
 import pytest
-from flatlanders.models import Post, RegisteredUser
+
+from flatlanders.models.posts import Post
+from flatlanders.models.users import RegisteredUser
 
 
 @pytest.mark.django_db

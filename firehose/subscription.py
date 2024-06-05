@@ -233,6 +233,10 @@ def process_queue(
     while True:
         message: MessageFrame = queue.get()
 
+        # Ignore messages that are not commits
+        if message.type != "#commit":
+            continue
+
         try:
             commit = parse_subscribe_repos_message(message)
         except Exception:  # pylint: disable=broad-except
@@ -249,7 +253,9 @@ def process_queue(
             cursor_value.value = commit.seq  # type: ignore
             # If the current state has fallen at least 100 behind, update it
             if cursor_value.value % 100 == 0:  # type: ignore
-                SubscriptionState.objects.update_or_create(service=base_uri, defaults={"cursor": cursor_value.value})  # type: ignore
+                SubscriptionState.objects.update_or_create(
+                    service=base_uri, defaults={"cursor": cursor_value.value}
+                )  # type: ignore
 
         ops = _get_ops_by_type(commit)
         operations_callback(ops)

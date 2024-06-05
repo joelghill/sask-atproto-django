@@ -1,7 +1,11 @@
-""" Admin classes for flatlanders app """
+"""Admin classes for flatlanders app"""
+
 from django.contrib import admin
 from django.db.models.query import QuerySet
-from .models import Post, RegisteredUser
+
+from flatlanders.models.labelers import LabelerCursorState
+from flatlanders.models.posts import Post
+from flatlanders.models.users import RegisteredUser
 
 
 class PostAdmin(admin.ModelAdmin):
@@ -36,6 +40,17 @@ class RegisteredUserAdmin(admin.ModelAdmin):
         queryset.update(expires_at=None)
 
 
+class labelerCursorStateAdmin(admin.ModelAdmin):
+    """Admin class for labelerCursorState"""
+
+    list_display = (
+        "labeler_service",
+        "cursor",
+    )
+
+    search_fields = ("labeler_service",)
+
 
 admin.site.register(Post, PostAdmin)
 admin.site.register(RegisteredUser, RegisteredUserAdmin)
+admin.site.register(LabelerCursorState, labelerCursorStateAdmin)

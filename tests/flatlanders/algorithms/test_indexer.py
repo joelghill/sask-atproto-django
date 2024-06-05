@@ -1,20 +1,22 @@
 from unittest.mock import MagicMock
-from atproto import CID
-from django.utils import timezone
 
 import pytest
+from atproto import CID
 from atproto_client.models.app.bsky.feed.post import Main as MainPost
-from atproto_client.models.app.bsky.feed.like import Main as MainLike
-from atproto_client.models.app.bsky.feed.repost import Main as MainRepost
 from atproto_client.models.app.bsky.graph.follow import Main as MainFollow
-from atproto_client.models.com.atproto.repo.strong_ref import Main as MainStrongRef
+from django.utils import timezone
+
 from firehose.subscription import (
     CommitOperations,
     CreatedRecordOperation,
 )
-from flatlanders.algorithms import index_commit_operations, is_sask_text
-from flatlanders.models import Post, RegisteredUser
-from flatlanders.settings import FEEDGEN_ADMIN_DID, FEEDGEN_URI
+from flatlanders.algorithms.flatlanders_feed import (
+    index_commit_operations,
+    is_sask_text,
+)
+from flatlanders.models.posts import Post
+from flatlanders.models.users import RegisteredUser
+from flatlanders.settings import FEEDGEN_ADMIN_DID
 
 
 def test_is_sask_text():
