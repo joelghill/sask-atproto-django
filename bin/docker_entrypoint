@@ -4,6 +4,7 @@ set -e
 
 start_server() {
     echo "Starting server..."
+    /app/.venv/bin/python manage.py migrate
     exec /app/.venv/bin/gunicorn -c gunicorn.conf.py sk_atp_feed.wsgi
 }
 
@@ -14,11 +15,13 @@ start_indexer() {
 
 start_labeler() {
     echo "Starting labeler..."
+    /app/.venv/bin/python manage.py migrate
     exec /app/.venv/bin/python manage.py start_labeler
 }
 
 start_nginx() {
     echo "Starting server..."
+    /app/.venv/bin/python manage.py migrate
     exec nginx -g "daemon off;"
 }
 
