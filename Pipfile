@@ -10,7 +10,6 @@ psycopg = "*"
 dj-database-url = "*"
 atproto = "*"
 python-dotenv = "*"
-pydantic = "==2.4.*"
 
 [dev-packages]
 djlint = "*"
