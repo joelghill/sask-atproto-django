@@ -279,7 +279,7 @@ def run(base_uri, operations_callback, stream_stop_event: Event):
     client = FirehoseSubscribeReposClient(params, base_uri=base_uri)
 
     workers_count = settings.FIREHOSE_WORKERS_COUNT
-    max_queue_size = 2000
+    max_queue_size = 3000
 
     queue: Queue = Queue(maxsize=max_queue_size)
 
