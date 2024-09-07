@@ -250,9 +250,11 @@ def process_queue(
             continue
 
         if commit.seq > cursor_value.value:  # type: ignore
+            difference = commit.seq - cursor_value.value  # type: ignore
             cursor_value.value = commit.seq  # type: ignore
-            # If the current state has fallen at least 100 behind, update it
-            if cursor_value.value % 100 == 0:  # type: ignore
+
+            # If the current state has fallen at least 200 behind, update DB
+            if difference > 200:  # type: ignore
                 SubscriptionState.objects.update_or_create(
                     service=base_uri, defaults={"cursor": cursor_value.value}
                 )  # type: ignore
