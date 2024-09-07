@@ -175,8 +175,12 @@ def _get_ops_by_type(
             record_raw_data = car.blocks.get(op.cid)
             if not record_raw_data:
                 continue
+            try:
+                record = get_or_create(record_raw_data, strict=False)
+            except Exception:  # pylint
+                logger.exception("Failed to parse record: %s", record_raw_data)
+                continue
 
-            record = get_or_create(record_raw_data, strict=False)
             if record is None:
                 continue
 
