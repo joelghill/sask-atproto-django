@@ -1,9 +1,10 @@
 from unittest.mock import MagicMock
 
 import pytest
+from asgiref.sync import sync_to_async
 from atproto import CID
-from atproto_client.models.app.bsky.feed.post import Main as MainPost
-from atproto_client.models.app.bsky.graph.follow import Main as MainFollow
+from atproto_client.models.app.bsky.feed.post import Record as MainPost
+from atproto_client.models.app.bsky.graph.follow import Record as MainFollow
 from django.utils import timezone
 
 from firehose.subscription import (
@@ -31,12 +32,13 @@ def test_is_sask_text():
 
 
 @pytest.mark.django_db
-def test_index_new_sask_post():
+@pytest.mark.asyncio
+async def test_index_new_sask_post():
     # Creation of post record
     uri = "test_uri"
     cid = MagicMock(spec=CID)
     author_did = "test_author_did"
-    post_record = MainPost(createdAt=timezone.now().isoformat(), text="Saskatchewan")
+    post_record = MainPost(created_at=timezone.now().isoformat(), text="Saskatchewan")
     create_record_operation = CreatedRecordOperation[MainPost](
         post_record, uri, cid, author_did
     )
@@ -46,12 +48,13 @@ def test_index_new_sask_post():
     operations.posts.created.append(create_record_operation)
 
     # Indexing of commit operations
-    index_commit_operations(operations)
+    await index_commit_operations(operations)
 
-    assert Post.objects.count() == 1
-    assert Post.objects.first().text == "Saskatchewan"
+    assert await sync_to_async(Post.objects.count)() == 1
+    post = await sync_to_async(Post.objects.first)()
+    assert post.text == "Saskatchewan"
 
-    registered_user = RegisteredUser.objects.get(did=author_did)
+    registered_user = await sync_to_async(RegisteredUser.objects.get)(did=author_did)
 
     assert (
         registered_user.expires_at is not None
@@ -60,13 +63,14 @@ def test_index_new_sask_post():
 
 
 @pytest.mark.django_db
-def test_index_flatlander_follow():
+@pytest.mark.asyncio
+async def test_index_flatlander_follow():
     # Creation of post record
     uri = "test_uri"
     cid = "test_cid"
     author_did = "test_author_did"
     post_record = MainFollow(
-        createdAt=timezone.now().isoformat(), subject=FEEDGEN_ADMIN_DID
+        created_at=timezone.now().isoformat(), subject=FEEDGEN_ADMIN_DID
     )
     create_record_operation = CreatedRecordOperation[MainFollow](
         post_record, uri, cid, author_did
@@ -77,9 +81,9 @@ def test_index_flatlander_follow():
     operations.follows.created.append(create_record_operation)
 
     # Indexing of commit operations
-    index_commit_operations(operations)
+    await index_commit_operations(operations)
 
-    registered_user = RegisteredUser.objects.get(did=author_did)
+    registered_user = await sync_to_async(RegisteredUser.objects.get)(did=author_did)
     assert registered_user.expires_at is None
 
 

@@ -1,15 +1,16 @@
+import asyncio
 import logging
+import signal
+import time
 import typing as t
 from datetime import datetime
-from multiprocessing import Pool, Queue, Value
-from multiprocessing.sharedctypes import SynchronizedBase
-from multiprocessing.synchronize import Event
 
+from asgiref.sync import sync_to_async
 from atproto import (
     CAR,
     CID,
+    AsyncFirehoseSubscribeReposClient,
     AtUri,
-    FirehoseSubscribeReposClient,
     models,
     parse_subscribe_repos_message,
 )
@@ -23,23 +24,28 @@ from atproto_client.models.utils import get_or_create, is_record_type
 from django import db
 from django.utils import timezone
 
-from firehose import settings
 from firehose.models import SubscriptionState
 
 logger = logging.getLogger("feed")
 
 
 if t.TYPE_CHECKING:
+    from atproto_client.models.base import ModelBase
     from atproto_firehose.models import MessageFrame
 
 
 T = t.TypeVar("T", UnknownRecordType, DotDict)
 
+_INTERESTED_RECORDS = {
+    models.ids.AppBskyFeedPost: models.AppBskyFeedPost,
+    models.ids.AppBskyGraphFollow: models.AppBskyGraphFollow,
+}
+
 
 class CreatedRecordOperation(t.Generic[T]):
     """Represents a record that was created in a user's repo."""
 
-    record: T
+    record: T | DotDict
     uri: str
     cid: CID
     author_did: str
@@ -164,6 +170,9 @@ def _get_ops_by_type(
     for op in commit.ops:
         uri = AtUri.from_str(f"at://{commit.repo}/{op.path}")
 
+        if uri.collection not in _INTERESTED_RECORDS:
+            continue
+
         if op.action == "update":
             # not supported yet
             continue
@@ -184,14 +193,6 @@ def _get_ops_by_type(
             if record is None:
                 continue
 
-            if uri.collection == models.ids.AppBskyFeedLike and is_record_type(
-                record, models.AppBskyFeedLike
-            ):
-                operation = CreatedRecordOperation[Like](
-                    record=record, uri=str(uri), cid=op.cid, author=commit.repo
-                )
-                operation_by_type.likes.created.append(operation)
-
             elif uri.collection == models.ids.AppBskyFeedPost and is_record_type(
                 record, models.AppBskyFeedPost
             ):
@@ -206,104 +207,75 @@ def _get_ops_by_type(
                     record=record, uri=str(uri), cid=op.cid, author=commit.repo
                 )
                 operation_by_type.follows.created.append(operation)
-            elif uri.collection == models.ids.AppBskyFeedRepost and is_record_type(
-                record, models.AppBskyFeedRepost
-            ):
-                operation = CreatedRecordOperation[Repost](
-                    record=record, uri=str(uri), cid=op.cid, author=commit.repo
-                )
-                operation_by_type.reposts.created.append(operation)
 
         if op.action == "delete":
-            if uri.collection == models.ids.AppBskyFeedLike:
-                operation_by_type.likes.deleted.append(str(uri))
             if uri.collection == models.ids.AppBskyFeedPost:
                 operation_by_type.posts.deleted.append(str(uri))
             if uri.collection == models.ids.AppBskyGraphFollow:
                 operation_by_type.follows.deleted.append(str(uri))
-            if uri.collection == models.ids.AppBskyFeedRepost:
-                operation_by_type.reposts.deleted.append(str(uri))
 
     return operation_by_type
-
-
-def process_queue(
-    base_uri: str,
-    cursor_value: SynchronizedBase,
-    queue: Queue,
-    operations_callback,
-):
-    logger.info("Starting subscription worker")
-    while True:
-        message: MessageFrame = queue.get()
-
-        # Ignore messages that are not commits
-        if message.type != "#commit":
-            continue
-
-        try:
-            commit = parse_subscribe_repos_message(message)
-        except Exception:  # pylint: disable=broad-except
-            logger.exception("Failed to parse message: %s", str(message))
-            continue
-
-        if (
-            not isinstance(commit, models.ComAtprotoSyncSubscribeRepos.Commit)
-            or not commit.blocks
-        ):
-            continue
-
-        if commit.seq > cursor_value.value:  # type: ignore
-            difference = commit.seq - cursor_value.value  # type: ignore
-            cursor_value.value = commit.seq  # type: ignore
-
-            # If the current state has fallen at least 200 behind, update DB
-            if difference > 200:  # type: ignore
-                SubscriptionState.objects.update_or_create(
-                    service=base_uri, defaults={"cursor": cursor_value.value}
-                )  # type: ignore
-
-        ops = _get_ops_by_type(commit)
-        operations_callback(ops)
 
 
 def get_firehose_params(cursor_value) -> models.ComAtprotoSyncSubscribeRepos.Params:
     return models.ComAtprotoSyncSubscribeRepos.Params(cursor=cursor_value.value)
 
 
-def run(base_uri, operations_callback, stream_stop_event: Event):
-    # initialize client and state
-    state, _ = SubscriptionState.objects.get_or_create(
-        service=base_uri, defaults={"cursor": 0}
-    )
+async def update_cursor(
+    uri: str, cursor: int, client: AsyncFirehoseSubscribeReposClient
+) -> None:
+    if cursor % 100 == 0:
+        client.update_params(models.ComAtprotoSyncSubscribeRepos.Params(cursor=cursor))
+        await sync_to_async(
+            SubscriptionState.objects.update_or_create, thread_sensitive=True
+        )(service=uri, defaults={"cursor": cursor})
 
-    cursor = Value("i", state.cursor)
+
+async def signal_handler(client: AsyncFirehoseSubscribeReposClient) -> None:
+    print("Keyboard interrupt received. Stopping...")
+
+    # Stop receiving new messages
+    await client.stop()
+
+
+async def run(base_uri, operations_callback):
+    # initialize client and state
+    state, _ = await sync_to_async(
+        SubscriptionState.objects.get_or_create, thread_sensitive=True
+    )(service=base_uri, defaults={"cursor": 0})
+
     params = models.ComAtprotoSyncSubscribeRepos.Params(
         cursor=state.cursor if state.cursor > 0 else None
     )
 
-    client = FirehoseSubscribeReposClient(params, base_uri=base_uri)
-
-    workers_count = settings.FIREHOSE_WORKERS_COUNT
-    max_queue_size = 5000
-
-    queue: Queue = Queue(maxsize=max_queue_size)
-
+    client = AsyncFirehoseSubscribeReposClient(params, base_uri=base_uri)
+    signal.signal(
+        signal.SIGINT, lambda _, __: asyncio.create_task(signal_handler(client))
+    )
     db.connections.close_all()
 
-    pool = Pool(
-        workers_count,
-        process_queue,
-        (base_uri, cursor, queue, operations_callback),
-    )
 
-    def on_message_handler(message: "MessageFrame") -> None:
-        if cursor.value:  # type: ignore
-            # we are using updating the cursor state here because of multiprocessing
-            # typically you can call client.update_params() directly on commit processing
-            client.update_params(get_firehose_params(cursor))
+    async def on_message_handler(message: "MessageFrame") -> None:
+        # Ignore messages that are not commits
+        if message.type != "#commit":
+            return
 
-        queue.put(message)
+        try:
+            commit = parse_subscribe_repos_message(message)
+        except Exception:  # pylint: disable=broad-except
+            logger.exception("Failed to parse message: %s", str(message))
+            return
 
-    client.start(on_message_handler)
-    logger.info("Subscription workers stopped")
+        if (
+            not isinstance(commit, models.ComAtprotoSyncSubscribeRepos.Commit)
+            or not commit.blocks
+        ):
+            return
+
+        await update_cursor(base_uri, commit.seq, client)
+
+        ops = _get_ops_by_type(commit)
+        await operations_callback(ops)
+
+    await client.start(on_message_handler)
+    logger.info("Shutting down firehose client")

@@ -1,6 +1,5 @@
+import asyncio
 import logging
-import signal
-import sys
 import threading
 
 from django.core.management.base import BaseCommand
@@ -12,18 +11,9 @@ logger = logging.getLogger("feed")
 stream_stop_event = threading.Event()
 
 
-def log_post(commits: CommitOperations):
+async def log_post(commits: CommitOperations):
     for post in commits.posts.created:
-        print(f"[{post.record.created_at}]: {post.record_text}")
-
-
-def sigint_handler(*_):
-    print("Stopping data stream...")
-    stream_stop_event.set()
-    sys.exit(0)
-
-
-signal.signal(signal.SIGINT, sigint_handler)
+        print(f"[{post.record.created_at}]: {post.record_text}") # type: ignore
 
 
 class Command(BaseCommand):
@@ -47,6 +37,6 @@ class Command(BaseCommand):
 
     def handle(self, *args, **options):
         if options["algorithm"] == "logger":
-            run(options["service"], log_post, stream_stop_event)
+            asyncio.get_event_loop().run_until_complete(run(options["service"], log_post))
         elif options["algorithm"] == "flatlanders":
-            run(options["service"], index_commit_operations, stream_stop_event)
+            asyncio.get_event_loop().run_until_complete(run(options["service"], index_commit_operations))

@@ -1,8 +1,10 @@
 import logging
 import re
+from asyncio import TaskGroup
 from datetime import datetime, timedelta, timezone
 from typing import Iterable, List
 
+from asgiref.sync import sync_to_async
 from atproto_client.models.app.bsky.feed.post import Record as MainPost
 from atproto_client.models.app.bsky.graph.follow import Record as MainFollow
 
@@ -58,21 +60,22 @@ def flatlanders_handler(limit: int = 50, cursor: str | None = None):
     }
 
 
-def index_commit_operations(commits: CommitOperations):
+async def index_commit_operations(commits: CommitOperations):
     """Update indexed posts and author records from a commit operations object.
 
     Args:
         commits (CommitOperations): Repro operations to index
     """
-    # Process each commit operation
-    _process_created_posts(commits.posts.created)
-    _process_deleted_posts(commits.posts.deleted)
+    async with TaskGroup() as tg:
+        tg.create_task(_process_created_posts(commits.posts.created))
+        tg.create_task(_process_deleted_posts(commits.posts.deleted))
+        tg.create_task(_process_created_follows(commits.follows.created))
+        tg.create_task(_process_deleted_follows(commits.follows.deleted))
 
-    _process_created_follows(commits.follows.created)
-    _process_deleted_follows(commits.follows.deleted)
 
-
-def _process_created_posts(created_posts: Iterable[CreatedRecordOperation[MainPost]]):
+async def _process_created_posts(
+    created_posts: Iterable[CreatedRecordOperation[MainPost]],
+):
     """Indexes a post from a commit operations object.
 
     1. Check as to whether or not the record text contains an SK keyword
@@ -86,7 +89,10 @@ def _process_created_posts(created_posts: Iterable[CreatedRecordOperation[MainPo
     """
     for post in created_posts:
         # Get the author of the post from the database
-        author = RegisteredUser.objects.filter(did=post.author_did).first()
+        author = await sync_to_async(
+            RegisteredUser.objects.filter(did=post.author_did).first,
+            thread_sensitive=True,
+        )()
         # Get the text of the post and check if it contains an SK keyword
         is_sask_post = is_sask_text(post.record_text)
 
@@ -100,69 +106,83 @@ def _process_created_posts(created_posts: Iterable[CreatedRecordOperation[MainPo
             # If we don't have an author, create one
             if not author:
                 logger.debug("Creating new author: %s", post.author_did)
-                author = RegisteredUser.objects.create(did=post.author_did)
+                author = await sync_to_async(
+                    RegisteredUser.objects.create, thread_sensitive=True
+                )(did=post.author_did)
                 logger.info("New author registered: %s", author.did)
 
             logger.info("Indexing post from keyword match")
-            Post.from_post_record(post, is_sask_post, author)
+            await sync_to_async(Post.from_post_record, thread_sensitive=True)(
+                post, is_sask_post, author
+            )
 
         elif author and author.is_active():
             logger.debug("Post from registered author: %s", post.record_text)
             # Replies to non-indexed posts are ignored
             if (
                 post.record_reply
-                and not Post.objects.filter(uri=post.record_reply).exists()
+                and not await sync_to_async(
+                    Post.objects.filter(uri=post.record_reply).exists,
+                    thread_sensitive=True,
+                )()
             ):
                 continue
             logger.info("Indexing post from registered author: %s", post.record_text)
-            Post.from_post_record(post, is_sask_post, author)
+            await sync_to_async(Post.from_post_record, thread_sensitive=True)(
+                post, is_sask_post, author
+            )
 
 
-def _process_deleted_posts(uris: List[str]):
+async def _process_deleted_posts(uris: List[str]):
     """Deletes a post from the database"""
     if uris:
-        Post.objects.filter(uri__in=uris).delete()
+        await sync_to_async(
+            Post.objects.filter(uri__in=uris).delete, thread_sensitive=True
+        )()
 
 
-def _process_created_follows(follows: List[CreatedRecordOperation[MainFollow]]):
+async def _process_created_follows(follows: List[CreatedRecordOperation[MainFollow]]):
     """If you follow the feed admin, you are added to the feed"""
     for follow in follows:
         if follow.record_subject_uri == FEEDGEN_ADMIN_DID:
             logger.info("User followed feed admin: %s", follow.author_did)
-            Follow.objects.get_or_create(
+            await sync_to_async(Follow.objects.get_or_create, thread_sensitive=True)(
                 uri=follow.uri,
                 cid=follow.cid,
                 subject=follow.record_subject_uri,
                 author=follow.author_did,
             )
 
-            user, created = RegisteredUser.objects.get_or_create(
-                did=follow.author_did, defaults={"expires_at": None}
-            )
+            user, created = await sync_to_async(
+                RegisteredUser.objects.get_or_create, thread_sensitive=True
+            )(did=follow.author_did, defaults={"expires_at": None})
 
             if created:
                 logger.info("New user registered: %s", follow.author_did)
             else:
                 logger.info("User re-registered: %s", follow.author_did)
                 user.expires_at = None
-                user.save()
+                await sync_to_async(user.save, thread_sensitive=True)()
             logger.info(
                 "Registering user: %s",
                 follow.author_did,
             )
 
 
-def _process_deleted_follows(unfollows: List[str]):
+async def _process_deleted_follows(unfollows: List[str]):
     """If you unfollow the feed admin, you are removed from the feed"""
     for unfollow in unfollows:
-        record = Follow.objects.filter(uri=unfollow).first()
+        record = await sync_to_async(
+            Follow.objects.filter(uri=unfollow).first, thread_sensitive=True
+        )()
         if record:
-            record.delete()
+            await sync_to_async(record.delete, thread_sensitive=True)()
             yesterday = datetime.now(timezone.utc) - timedelta(days=1)
             if record.subject == FEEDGEN_ADMIN_DID:
-                RegisteredUser.objects.filter(did=record.author).update(
-                    expires_at=yesterday
-                )
+                await sync_to_async(
+                    RegisteredUser.objects.filter(did=record.author).update,
+                    thread_sensitive=True,
+                )(expires_at=yesterday)
                 logger.info("User expired via unfollow: %s", record.author)
 
 
