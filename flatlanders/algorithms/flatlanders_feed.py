@@ -17,6 +17,8 @@ from flatlanders.settings import FEEDGEN_ADMIN_DID, FEEDGEN_URI
 
 logger = logging.getLogger("feed")
 
+compiled_patterns = [re.compile(rf"\b{word}\b") for word in SASK_WORDS]
+
 
 def flatlanders_handler(limit: int = 50, cursor: str | None = None):
     """Return the feed skeleton for the flatlanders algorithm"""
@@ -87,15 +89,15 @@ async def _process_created_posts(
     5. If we do not have an author, but the text contains sask, save the post to the
        database and create the author record.
     """
+    author_dids = [post.author_did for post in created_posts]
+    authors = await sync_to_async(
+    RegisteredUser.objects.filter(did__in=author_dids).all, thread_sensitive=True)()
+    author_dict = {author.did: author for author in authors}
     for post in created_posts:
-        # Get the author of the post from the database
-        author = await sync_to_async(
-            RegisteredUser.objects.filter(did=post.author_did).first,
-            thread_sensitive=True,
-        )()
         # Get the text of the post and check if it contains an SK keyword
         is_sask_post = is_sask_text(post.record_text)
-
+        # Check if the author is in the dictionary
+        author = author_dict.get(post.author_did)
         # If the post is not a sask post, and we don't have an author, skip it
         if not author and not is_sask_post:
             continue
@@ -187,9 +189,8 @@ async def _process_deleted_follows(unfollows: List[str]):
 
 
 def is_sask_text(text: str) -> bool:
-    """Returns True if the text contains an SK keyword"""
     lower_text = text.lower()
-    return any([re.search(rf"\b{word}\b", lower_text) for word in SASK_WORDS])
+    return any(pattern.search(lower_text) for pattern in compiled_patterns)
 
 
 ALGORITHMS = {FEEDGEN_URI: flatlanders_handler}
