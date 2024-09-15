@@ -25,6 +25,7 @@ repo = client.com.atproto.repo.describe_repo({"repo": FEEDGEN_PUBLISHER_DID})
 did_doc = DidDocument.from_dict(repo.did_doc)
 client._base_url = f"{did_doc.get_pds_endpoint()}/xrpc"
 
+compiled_patterns = [re.compile(rf"\b{word}\b") for word in POLITICAL_CONTENT]
 
 def has_political_content(post: Post) -> bool:
     """Indicate if a post has political content.
@@ -36,7 +37,7 @@ def has_political_content(post: Post) -> bool:
         bool: True if text matches any of the political content keywords.
     """
     lower_text = post.text.lower()
-    return any([re.search(rf"\b{word}\b", lower_text) for word in POLITICAL_CONTENT])
+    return any(pattern.search(lower_text) for pattern in compiled_patterns)
 
 
 def raise_label_event(post: Post, label: str):

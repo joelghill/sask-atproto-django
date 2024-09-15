@@ -78,11 +78,9 @@ POLITICAL_WORDS = {
 
 
 POLITICIANS = {
-    # Independants
     "Ryan Domotor",
     "Greg Lawrence",
     "Nadine Wilson",
-    # Sask NDP
     "carla beck",
     "jennifer bowes",
     "Noor Burki",
@@ -90,14 +88,13 @@ POLITICIANS = {
     "Meara Conway",
     "Matt Love",
     "Vicki Mowat",
-    "Betty Nippi-Albright" "Betty Nippi",
+    "Betty Nippi-Albright", "Betty Nippi",
     "Erika Ritchie",
     "Nicole Sarauer",
     "Nathaniel Teed",
     "Doyle Vermette",
     "Trent Wotherspoon",
-    "Aleana Young"
-    # Sask Party
+    "Aleana Young",
     "Steven Bonk",
     "Terry Dennis",
     "Dustion Duncan",
