@@ -260,7 +260,7 @@ async def run(base_uri, operations_callback):
     async def on_message_handler(message: "MessageFrame") -> None:
         # Close all connections since they may become stale.
         # This is a workaround for DB connections timing out in the background.
-        db.connections.close_all()
+        db.close_old_connections()
 
         # Ignore messages that are not commits
         if message.type != "#commit" or "blocks" not in message.body:
