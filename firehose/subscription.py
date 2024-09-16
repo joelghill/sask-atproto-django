@@ -228,8 +228,9 @@ def get_firehose_params(cursor_value) -> models.ComAtprotoSyncSubscribeRepos.Par
 async def update_cursor(
     uri: str, cursor: int, client: AsyncFirehoseSubscribeReposClient
 ) -> None:
-    if cursor % 5000 == 0:
+    if cursor % 100 == 0:
         client.update_params(models.ComAtprotoSyncSubscribeRepos.Params(cursor=cursor))
+    if cursor % 5000 == 0:
         await SubscriptionState.objects.aupdate_or_create(
             service=uri, defaults={"cursor": cursor}
         )
