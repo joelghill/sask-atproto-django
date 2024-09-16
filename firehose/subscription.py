@@ -256,9 +256,12 @@ async def run(base_uri, operations_callback):
     signal.signal(
         signal.SIGINT, lambda _, __: asyncio.create_task(signal_handler(client))
     )
-    db.connections.close_all()
 
     async def on_message_handler(message: "MessageFrame") -> None:
+        # Close all connections since they may become stale.
+        # This is a workaround for DB connections timing out in the background.
+        db.connections.close_all()
+
         # Ignore messages that are not commits
         if message.type != "#commit" or "blocks" not in message.body:
             return
