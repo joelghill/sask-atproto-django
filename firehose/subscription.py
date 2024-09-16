@@ -1,11 +1,9 @@
 import asyncio
 import logging
 import signal
-import time
 import typing as t
 from datetime import datetime
 
-from asgiref.sync import sync_to_async
 from atproto import (
     CAR,
     CID,
@@ -14,6 +12,7 @@ from atproto import (
     models,
     parse_subscribe_repos_message,
 )
+from atproto_client.exceptions import ModelError
 from atproto_client.models.app.bsky.feed.like import Record as Like
 from atproto_client.models.app.bsky.feed.post import Record as Post
 from atproto_client.models.app.bsky.feed.repost import Record as Repost
@@ -186,6 +185,11 @@ def _get_ops_by_type(
                 continue
             try:
                 record = get_or_create(record_raw_data, strict=False)
+            except ModelError as e:
+                logger.error("Failed to parse record: %s", record_raw_data)
+                logger.error("Error: %s", e)
+                continue
+
             except Exception:  # pylint
                 logger.exception("Failed to parse record: %s", record_raw_data)
                 continue
@@ -226,9 +230,9 @@ async def update_cursor(
 ) -> None:
     if cursor % 100 == 0:
         client.update_params(models.ComAtprotoSyncSubscribeRepos.Params(cursor=cursor))
-        await sync_to_async(
-            SubscriptionState.objects.update_or_create, thread_sensitive=True
-        )(service=uri, defaults={"cursor": cursor})
+        await SubscriptionState.objects.aupdate_or_create(
+            service=uri, defaults={"cursor": cursor}
+        )
 
 
 async def signal_handler(client: AsyncFirehoseSubscribeReposClient) -> None:
@@ -240,9 +244,9 @@ async def signal_handler(client: AsyncFirehoseSubscribeReposClient) -> None:
 
 async def run(base_uri, operations_callback):
     # initialize client and state
-    state, _ = await sync_to_async(
-        SubscriptionState.objects.get_or_create, thread_sensitive=True
-    )(service=base_uri, defaults={"cursor": 0})
+    state, _ = await SubscriptionState.objects.aget_or_create(
+        service=base_uri, defaults={"cursor": 0}
+    )
 
     params = models.ComAtprotoSyncSubscribeRepos.Params(
         cursor=state.cursor if state.cursor > 0 else None
@@ -254,18 +258,21 @@ async def run(base_uri, operations_callback):
     )
     db.connections.close_all()
 
-
     async def on_message_handler(message: "MessageFrame") -> None:
         # Ignore messages that are not commits
-        if message.type != "#commit":
+        if message.type != "#commit" or "blocks" not in message.body:
             return
 
         try:
             commit = parse_subscribe_repos_message(message)
+        except ModelError as e:
+            logger.error("Failed to parse message: %s", str(message))
+            logger.error("Error: %s", e)
+            return
+
         except Exception:  # pylint: disable=broad-except
             logger.exception("Failed to parse message: %s", str(message))
             return
-
         if (
             not isinstance(commit, models.ComAtprotoSyncSubscribeRepos.Commit)
             or not commit.blocks

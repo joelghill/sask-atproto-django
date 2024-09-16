@@ -1,8 +1,9 @@
-""" This module contains the models for the flatlanders app. """
+"""This module contains the models for the flatlanders app."""
+
 import logging
 
 from atproto_client.models.app.bsky.feed.post import Record as MainPost
-from django.db import IntegrityError, models
+from django.db import models
 
 from firehose.subscription import CreatedRecordOperation
 from flatlanders.models.users import RegisteredUser
@@ -61,7 +62,7 @@ class Post(Record):
     is_community_match = models.BooleanField(default=False)
 
     @classmethod
-    def from_post_record(
+    async def from_post_record(
         cls,
         post_record: CreatedRecordOperation[MainPost],
         is_community_match: bool,
@@ -78,7 +79,7 @@ class Post(Record):
             Post: The post instance
         """
         try:
-            cls.objects.create(
+            await cls.objects.acreate(
                 uri=post_record.uri,
                 cid=str(post_record.cid),
                 author=author,

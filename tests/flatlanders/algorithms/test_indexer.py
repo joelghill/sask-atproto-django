@@ -1,7 +1,6 @@
 from unittest.mock import MagicMock
 
 import pytest
-from asgiref.sync import sync_to_async
 from atproto import CID
 from atproto_client.models.app.bsky.feed.post import Record as MainPost
 from atproto_client.models.app.bsky.graph.follow import Record as MainFollow
@@ -50,11 +49,11 @@ async def test_index_new_sask_post():
     # Indexing of commit operations
     await index_commit_operations(operations)
 
-    assert await sync_to_async(Post.objects.count)() == 1
-    post = await sync_to_async(Post.objects.first)()
+    assert await Post.objects.acount() == 1
+    post = await Post.objects.afirst()
     assert post.text == "Saskatchewan"
 
-    registered_user = await sync_to_async(RegisteredUser.objects.get)(did=author_did)
+    registered_user = await RegisteredUser.objects.aget(did=author_did)
 
     assert (
         registered_user.expires_at is not None
@@ -83,7 +82,7 @@ async def test_index_flatlander_follow():
     # Indexing of commit operations
     await index_commit_operations(operations)
 
-    registered_user = await sync_to_async(RegisteredUser.objects.get)(did=author_did)
+    registered_user = await RegisteredUser.objects.aget(did=author_did)
     assert registered_user.expires_at is None
 
 
