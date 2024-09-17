@@ -259,7 +259,6 @@ async def run(base_uri, operations_callback):
     )
 
     async def on_message_handler(message: "MessageFrame") -> None:
-
         # Ignore messages that are not commits
         if message.type != "#commit" or "blocks" not in message.body:
             return
@@ -274,19 +273,32 @@ async def run(base_uri, operations_callback):
         except Exception:  # pylint: disable=broad-except
             logger.exception("Failed to parse message: %s", str(message))
             return
+
         if (
             not isinstance(commit, models.ComAtprotoSyncSubscribeRepos.Commit)
             or not commit.blocks
         ):
             return
 
+        # Update the cursor every 20 commits
+        if commit.seq % 20 == 0:
+            client.update_params(
+                models.ComAtprotoSyncSubscribeRepos.Params(cursor=commit.seq)
+            )
+
+        # Process the operations in the commit
         ops = _get_ops_by_type(commit)
         await operations_callback(ops)
-        await update_cursor(base_uri, commit.seq, client)
+
+        # Update the cursor in the database every 5000 commits
+        if commit.seq % 5000 == 0:
+            await SubscriptionState.objects.aupdate_or_create(
+                service=base_uri, defaults={"cursor": commit.seq}
+            )
 
         # Close all connections since they may become stale.
         # This is a workaround for DB connections timing out in the background.
-        #db.connections.close_all()
+        # db.connections.close_all()
 
     await client.start(on_message_handler)
     logger.info("Shutting down firehose client")
