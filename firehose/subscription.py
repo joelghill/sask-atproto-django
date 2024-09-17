@@ -259,9 +259,6 @@ async def run(base_uri, operations_callback):
     )
 
     async def on_message_handler(message: "MessageFrame") -> None:
-        # Close all connections since they may become stale.
-        # This is a workaround for DB connections timing out in the background.
-        db.connections.close_all()
 
         # Ignore messages that are not commits
         if message.type != "#commit" or "blocks" not in message.body:
@@ -283,10 +280,13 @@ async def run(base_uri, operations_callback):
         ):
             return
 
-        await update_cursor(base_uri, commit.seq, client)
-
         ops = _get_ops_by_type(commit)
         await operations_callback(ops)
+        await update_cursor(base_uri, commit.seq, client)
+
+        # Close all connections since they may become stale.
+        # This is a workaround for DB connections timing out in the background.
+        #db.connections.close_all()
 
     await client.start(on_message_handler)
     logger.info("Shutting down firehose client")
