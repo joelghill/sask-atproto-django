@@ -228,7 +228,7 @@ def get_firehose_params(cursor_value) -> models.ComAtprotoSyncSubscribeRepos.Par
 async def update_cursor(
     uri: str, cursor: int, client: AsyncFirehoseSubscribeReposClient
 ) -> None:
-    if cursor % 100 == 0:
+    if cursor % 20 == 0:
         client.update_params(models.ComAtprotoSyncSubscribeRepos.Params(cursor=cursor))
     if cursor % 5000 == 0:
         await SubscriptionState.objects.aupdate_or_create(
@@ -261,7 +261,7 @@ async def run(base_uri, operations_callback):
     async def on_message_handler(message: "MessageFrame") -> None:
         # Close all connections since they may become stale.
         # This is a workaround for DB connections timing out in the background.
-        db.close_old_connections()
+        db.connections.close_all()
 
         # Ignore messages that are not commits
         if message.type != "#commit" or "blocks" not in message.body:
