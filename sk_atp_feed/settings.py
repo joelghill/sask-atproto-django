@@ -13,6 +13,7 @@ https://docs.djangoproject.com/en/4.1/ref/settings/
 import os
 from pathlib import Path
 
+import sentry_sdk
 from django.core.management.utils import get_random_secret_key
 from dotenv import load_dotenv
 
@@ -212,3 +213,17 @@ STATICFILES_DIRS = [
 # https://docs.djangoproject.com/en/4.1/ref/settings/#default-auto-field
 
 DEFAULT_AUTO_FIELD = "django.db.models.BigAutoField"
+
+# Sentry SDK for error tracking
+SENTRY_DNS = os.getenv("SENTRY_DNS")
+if SENTRY_DNS:
+    sentry_sdk.init(
+        dsn=SENTRY_DNS,
+        # Set traces_sample_rate to 1.0 to capture 100%
+        # of transactions for tracing.
+        traces_sample_rate=1.0,
+        # Set profiles_sample_rate to 1.0 to profile 100%
+        # of sampled transactions.
+        # We recommend adjusting this value in production.
+        profiles_sample_rate=1.0,
+)
