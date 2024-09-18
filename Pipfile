@@ -10,6 +10,7 @@ psycopg = "*"
 dj-database-url = "*"
 atproto = "*"
 python-dotenv = "*"
+sentry-sdk = {extras = ["django"], version = "*"}
 
 [dev-packages]
 djlint = "*"
