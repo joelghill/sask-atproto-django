@@ -1,0 +1,113 @@
+SASK-ATPROTO-DJANGO
+- Dockerfile <- Defines the Docker container for the application.
+- LICENSE
+- Pipfile
+- Pipfile.lock
+- README.md
+- bin
+  - docker_entrypoint
+- example.env <- Template for environment variables.
+- firehose <- Handles connection to the Bluesky firehose (real-time data stream).
+  - __init__.py
+  - __pycache__
+    - __init__.cpython-312.pyc
+    - models.cpython-312.pyc
+    - subscription.cpython-312.pyc
+  - admin.py <- registers models related to the Bluesky firehose data
+  - apps.py <- set up configurations for connecting to the Bluesky firehose
+  - management 
+    - __init__.py
+    - commands
+      - __init__.py
+      - start_feed.py <- Command to start the feed ingestion process.
+  - migrations <- maintaining the database schema and structure
+    - 0001_initial.py
+    - __init__.py
+  - models.py <- Data models for storing firehose data.
+  - settings.py
+  - subscription.py <- Manages subscription to the firehose.
+  - tests.py
+  - views.py
+- flatlanders <- Core app for the custom feed algorithm.
+  - __init__.py
+  - __pycache__
+    - __init__.cpython-312.pyc
+  - admin.py <- registers models specific to the custom feed algorithm, such as user data, post data, or labeler data
+  - algorithms
+    - __init__.py
+    - __pycache__
+      - __init__.cpython-312.pyc
+      - flatlanders_feed.cpython-312.pyc
+    - errors.py
+    - flatlanders_feed.py <- Implementation of the custom feed algorithm.
+  - apps.py <- initialize components of the custom feed algorithm
+  - keywords.py <- defines keywords for content filtering of Sask related words.
+  - labelers.py <- Implements content labeling functionality
+  - management
+    - __init__.py
+    - commands
+      - __init__.py
+      - start_labeler.py <- Command to start the content labeling process.
+  - migrations
+    - 0001_initial.py
+    - 0002_alter_registereduser_expires_at.py
+    - 0003_labellercursorstate.py
+    - __init__.py
+  - models <- Data models for users, posts, and labelers.
+    - __init__.py
+    - __pycache__
+      - __init__.cpython-312.pyc
+      - posts.cpython-312.pyc
+    - labelers.py
+    - posts.py
+    - users.py
+  - settings.py
+  - tests.py
+  - views.py <- manage the presentation and interaction with the custom feed algorithm
+- gunicorn.conf.py <- Configuration for the Gunicorn WSGI server.
+- manage.py <- Django's command-line utility for administrative tasks.
+- publish_feed.py <- Script to publish the custom feed to the Bluesky network.
+- pyproject.toml <- Configuration file for Python tools.
+- pytest.ini <- Configuration for pytest testing framework.
+- requirements.txt <- Lists Python package dependencies.
+- sk_atp_feed <-  Main Django project directory.
+  - __init__.py 
+  - asgi.py <- Entry points for ASGI server.
+  - settings.py <- Django project settings.
+  - urls.py <- URL routing configuration.
+  - wsgi.py <- Entry points for WSGI server.
+- static
+  - css
+    - bootstrap.min.css
+    - bootstrap.min.css.map
+  - js
+    - bootstrap.min.js
+    - bootstrap.min.js.map
+- templates
+  - base.html
+  - home.html
+  - protected.html
+  - registration
+    - login.html
+- tests
+  - __init__.py
+  - __pycache__
+    - __init__.cpython-312.pyc
+  - flatlanders
+    - __init__.py
+    - __pycache__
+      - __init__.cpython-312.pyc
+      - test_views.cpython-312-pytest-8.3.2.pyc
+    - algorithms
+      - __init__.py
+      - __pycache__
+        - __init__.cpython-312.pyc
+        - test_indexer.cpython-312-pytest-8.3.2.pyc
+      - test_indexer.py
+    - models
+      - __init__.py
+      - __pycache__
+        - __init__.cpython-312.pyc
+        - test_post_model.cpython-312-pytest-8.3.2.pyc
+      - test_post_model.py
+    - test_views.py
