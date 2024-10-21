@@ -11,6 +11,7 @@ dj-database-url = "*"
 atproto = "*"
 python-dotenv = "*"
 sentry-sdk = {extras = ["django"], version = "*"}
+uvloop = "*"
 
 [dev-packages]
 djlint = "*"

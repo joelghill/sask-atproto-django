@@ -5,6 +5,7 @@ import typing as t
 from datetime import datetime
 
 import sentry_sdk
+from asgiref.sync import sync_to_async
 from atproto import (
     CAR,
     CID,
@@ -257,15 +258,33 @@ async def signal_handler(client: AsyncFirehoseSubscribeReposClient) -> None:
     await client.stop()
 
 
+async def consumer_watchdog(
+    client: AsyncFirehoseSubscribeReposClient, base_uri: str
+) -> None:
+    """Task that monitors the current cursor state and stops the client if it stalls.
+
+    Args:
+        client (AsyncFirehoseSubscribeReposClient): The firehose client.
+        base_uri (str): The base URI of the firehose service.
+    """
+    last_state, _ = await SubscriptionState.objects.aget_or_create(
+        service=base_uri, defaults={"cursor": 0}
+    )
+    while True:
+        await asyncio.sleep(60)
+        state = await SubscriptionState.objects.aget(service=base_uri)
+        if not state.cursor > last_state.cursor:
+            await client.stop()
+            break
+
+
 async def run(base_uri, operations_callback):
     # initialize client and state
     state, _ = await SubscriptionState.objects.aget_or_create(
         service=base_uri, defaults={"cursor": 0}
     )
 
-    params = models.ComAtprotoSyncSubscribeRepos.Params(
-        cursor=state.cursor if state.cursor > 0 else None
-    )
+    params = models.ComAtprotoSyncSubscribeRepos.Params(cursor=state.cursor)
 
     client = AsyncFirehoseSubscribeReposClient(params, base_uri=base_uri)
     signal.signal(
@@ -273,6 +292,9 @@ async def run(base_uri, operations_callback):
     )
 
     async def on_message_handler(message: "MessageFrame") -> None:
+        # Ensure there is a db connection since this is a long running process without a request context
+        await sync_to_async(db.connection.connect)()
+
         # Ignore messages that are not commits
         if message.type != "#commit" or "blocks" not in message.body:
             return
@@ -288,31 +310,21 @@ async def run(base_uri, operations_callback):
             logger.exception("Failed to parse message: %s", str(message))
             return
 
+        # Update the cursor
+        await update_cursor(base_uri, commit.seq, client)
+
         if (
             not isinstance(commit, models.ComAtprotoSyncSubscribeRepos.Commit)
             or not commit.blocks
         ):
             return
 
-        # Update the cursor every 20 commits
-        if commit.seq % 20 == 0:
-            client.update_params(
-                models.ComAtprotoSyncSubscribeRepos.Params(cursor=commit.seq)
-            )
-
-        # Process the operations in the commit
         ops = _get_ops_by_type(commit)
         await operations_callback(ops)
 
-        # Update the cursor in the database every 5000 commits
-        if commit.seq % 5000 == 0:
-            await SubscriptionState.objects.aupdate_or_create(
-                service=base_uri, defaults={"cursor": commit.seq}
-            )
+    async with asyncio.TaskGroup() as group:
+        # Spawn the client and watchdog tasks
+        group.create_task(client.start(on_message_handler))
+        group.create_task(consumer_watchdog(client, base_uri))
 
-        # Close all connections since they may become stale.
-        # This is a workaround for DB connections timing out in the background.
-        # db.connections.close_all()
-
-    await client.start(on_message_handler)
     logger.info("Shutting down firehose client")
