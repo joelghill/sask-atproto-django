@@ -243,9 +243,8 @@ def get_firehose_params(cursor_value) -> models.ComAtprotoSyncSubscribeRepos.Par
 async def update_cursor(
     uri: str, cursor: int, client: AsyncFirehoseSubscribeReposClient
 ) -> None:
-    if cursor % 20 == 0:
+    if cursor % 100 == 0:
         client.update_params(models.ComAtprotoSyncSubscribeRepos.Params(cursor=cursor))
-    if cursor % 5000 == 0:
         await SubscriptionState.objects.aupdate_or_create(
             service=uri, defaults={"cursor": cursor}
         )
@@ -274,6 +273,7 @@ async def consumer_watchdog(
         await asyncio.sleep(60)
         state = await SubscriptionState.objects.aget(service=base_uri)
         if not state.cursor > last_state.cursor:
+            logger.error("Subscription stalled. Stopping client...")
             await client.stop()
             break
 
