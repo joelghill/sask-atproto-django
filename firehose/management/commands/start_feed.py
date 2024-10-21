@@ -1,20 +1,18 @@
 import asyncio
 import logging
-import threading
 
+import uvloop
 from django.core.management.base import BaseCommand
 
 from firehose.subscription import CommitOperations, run
 from flatlanders.algorithms.flatlanders_feed import index_commit_operations
 
 logger = logging.getLogger("feed")
-stream_stop_event = threading.Event()
 
 
 async def log_post(commits: CommitOperations):
     for post in commits.posts.created:
-        print(f"[{post.record.created_at}]: {post.record_text}") # type: ignore
-
+        print(f"[{post.record.created_at}]: {post.record_text}")  # type: ignore
 
 class Command(BaseCommand):
     help = "Connects to the BSky firehose and starts processing repository commits."
@@ -36,7 +34,11 @@ class Command(BaseCommand):
         )
 
     def handle(self, *args, **options):
+        operations_callback = None
         if options["algorithm"] == "logger":
-            asyncio.get_event_loop().run_until_complete(run(options["service"], log_post))
+            operations_callback = log_post
         elif options["algorithm"] == "flatlanders":
-            asyncio.get_event_loop().run_until_complete(run(options["service"], index_commit_operations))
+            operations_callback = index_commit_operations
+
+        with asyncio.Runner(loop_factory=uvloop.new_event_loop) as runner:
+            runner.run(run(options["service"], operations_callback))

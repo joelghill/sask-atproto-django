@@ -5,6 +5,7 @@ import typing as t
 from datetime import datetime
 
 import sentry_sdk
+from asgiref.sync import sync_to_async
 from atproto import (
     CAR,
     CID,
@@ -256,15 +257,33 @@ async def signal_handler(client: AsyncFirehoseSubscribeReposClient) -> None:
     await client.stop()
 
 
+async def consumer_watchdog(
+    client: AsyncFirehoseSubscribeReposClient, base_uri: str
+) -> None:
+    """Task that monitors the current cursor state and stops the client if it stalls.
+
+    Args:
+        client (AsyncFirehoseSubscribeReposClient): The firehose client.
+        base_uri (str): The base URI of the firehose service.
+    """
+    last_state, _ = await SubscriptionState.objects.aget_or_create(
+        service=base_uri, defaults={"cursor": 0}
+    )
+    while True:
+        await asyncio.sleep(60)
+        state = await SubscriptionState.objects.aget(service=base_uri)
+        if not state.cursor > last_state.cursor:
+            await client.stop()
+            break
+
+
 async def run(base_uri, operations_callback):
     # initialize client and state
     state, _ = await SubscriptionState.objects.aget_or_create(
         service=base_uri, defaults={"cursor": 0}
     )
 
-    params = models.ComAtprotoSyncSubscribeRepos.Params(
-        cursor=state.cursor if state.cursor > 0 else None
-    )
+    params = models.ComAtprotoSyncSubscribeRepos.Params(cursor=state.cursor)
 
     client = AsyncFirehoseSubscribeReposClient(params, base_uri=base_uri)
     signal.signal(
@@ -272,9 +291,8 @@ async def run(base_uri, operations_callback):
     )
 
     async def on_message_handler(message: "MessageFrame") -> None:
-        # Close all connections since they may become stale.
-        # This is a workaround for DB connections timing out in the background.
-        db.connections.close_all()
+        # Ensure there is a db connection since this is a long running process without a request context
+        await sync_to_async(db.connection.connect)()
 
         # Ignore messages that are not commits
         if message.type != "#commit" or "blocks" not in message.body:
@@ -290,16 +308,22 @@ async def run(base_uri, operations_callback):
         except Exception:  # pylint: disable=broad-except
             logger.exception("Failed to parse message: %s", str(message))
             return
+
+        # Update the cursor
+        await update_cursor(base_uri, commit.seq, client)
+
         if (
             not isinstance(commit, models.ComAtprotoSyncSubscribeRepos.Commit)
             or not commit.blocks
         ):
             return
 
-        await update_cursor(base_uri, commit.seq, client)
-
         ops = _get_ops_by_type(commit)
         await operations_callback(ops)
 
-    await client.start(on_message_handler)
+    async with asyncio.TaskGroup() as group:
+        # Spawn the client and watchdog tasks
+        group.create_task(client.start(on_message_handler))
+        group.create_task(consumer_watchdog(client, base_uri))
+
     logger.info("Shutting down firehose client")
