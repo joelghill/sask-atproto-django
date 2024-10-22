@@ -276,6 +276,7 @@ async def consumer_watchdog(
             logger.error("Subscription stalled. Stopping client...")
             await client.stop()
             break
+        last_state = state
 
 
 async def run(base_uri, operations_callback):
