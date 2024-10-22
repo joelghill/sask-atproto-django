@@ -294,7 +294,7 @@ async def run(base_uri, operations_callback):
 
     async def on_message_handler(message: "MessageFrame") -> None:
         # Ensure there is a db connection since this is a long running process without a request context
-        await sync_to_async(db.connection.connect)()
+        #await sync_to_async(db.connection.connect)()
 
         # Ignore messages that are not commits
         if message.type != "#commit" or "blocks" not in message.body:
@@ -326,6 +326,6 @@ async def run(base_uri, operations_callback):
     async with asyncio.TaskGroup() as group:
         # Spawn the client and watchdog tasks
         group.create_task(client.start(on_message_handler))
-        #group.create_task(consumer_watchdog(client, base_uri))
+        group.create_task(consumer_watchdog(client, base_uri))
 
     logger.info("Shutting down firehose client")
