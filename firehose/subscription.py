@@ -326,6 +326,6 @@ async def run(base_uri, operations_callback):
     async with asyncio.TaskGroup() as group:
         # Spawn the client and watchdog tasks
         group.create_task(client.start(on_message_handler))
-        group.create_task(consumer_watchdog(client, base_uri))
+        #group.create_task(consumer_watchdog(client, base_uri))
 
     logger.info("Shutting down firehose client")
