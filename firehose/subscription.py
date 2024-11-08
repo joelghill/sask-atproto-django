@@ -22,6 +22,7 @@ from atproto_client.models.app.bsky.graph.follow import Record as Follow
 from atproto_client.models.dot_dict import DotDict
 from atproto_client.models.unknown_type import UnknownRecordType
 from atproto_client.models.utils import get_or_create, is_record_type
+from atproto_firehose.exceptions import FirehoseError
 from django import db
 from django.utils import timezone
 
@@ -54,6 +55,12 @@ _INTERESTED_RECORDS = {
     models.ids.AppBskyFeedPost: models.AppBskyFeedPost,
     models.ids.AppBskyGraphFollow: models.AppBskyGraphFollow,
 }
+
+
+class WatchDogTimeoutError(Exception):
+    """Raised when the watchdog detects a stall."""
+
+    pass
 
 
 class CreatedRecordOperation(t.Generic[T]):
@@ -273,8 +280,7 @@ async def consumer_watchdog(
         await asyncio.sleep(60)
         state = await SubscriptionState.objects.aget(service=base_uri)
         if not state.cursor > last_state.cursor:
-            await client.stop()
-            break
+            raise WatchDogTimeoutError("Firehose client has stalled.")
 
 
 async def run(base_uri, operations_callback):
@@ -320,10 +326,12 @@ async def run(base_uri, operations_callback):
 
         ops = _get_ops_by_type(commit)
         await operations_callback(ops)
-
-    async with asyncio.TaskGroup() as group:
-        # Spawn the client and watchdog tasks
-        group.create_task(client.start(on_message_handler))
-        group.create_task(consumer_watchdog(client, base_uri))
+    try:
+        async with asyncio.TaskGroup() as group:
+            # Spawn the client and watchdog tasks
+            group.create_task(client.start(on_message_handler))
+            group.create_task(consumer_watchdog(client, base_uri))
+    except (FirehoseError, WatchDogTimeoutError) as e:
+        logger.warning("Firehose consumer has terminated due to en error: %s", e)
 
     logger.info("Shutting down firehose client")
