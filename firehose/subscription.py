@@ -281,6 +281,7 @@ async def consumer_watchdog(
         state = await SubscriptionState.objects.aget(service=base_uri)
         if not state.cursor > last_state.cursor:
             raise WatchDogTimeoutError("Firehose client has stalled.")
+        last_state = state
 
 
 async def run(base_uri, operations_callback):
