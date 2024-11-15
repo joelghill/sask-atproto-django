@@ -12,6 +12,7 @@ atproto = "*"
 python-dotenv = "*"
 sentry-sdk = {extras = ["django"], version = "*"}
 uvloop = "*"
+websockets = "*"
 
 [dev-packages]
 djlint = "*"
