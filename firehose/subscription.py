@@ -1,11 +1,12 @@
 import asyncio
 import logging
+import os
 import signal
 import typing as t
+from concurrent.futures import ProcessPoolExecutor
 from datetime import datetime
 
 import sentry_sdk
-from asgiref.sync import sync_to_async
 from atproto import (
     CAR,
     CID,
@@ -19,11 +20,12 @@ from atproto_client.models.app.bsky.feed.like import Record as Like
 from atproto_client.models.app.bsky.feed.post import Record as Post
 from atproto_client.models.app.bsky.feed.repost import Record as Repost
 from atproto_client.models.app.bsky.graph.follow import Record as Follow
+from atproto_client.models.com.atproto.sync.subscribe_repos import Commit
 from atproto_client.models.dot_dict import DotDict
 from atproto_client.models.unknown_type import UnknownRecordType
 from atproto_client.models.utils import get_or_create, is_record_type
 from atproto_firehose.exceptions import FirehoseError
-from django import db
+from atproto_firehose.models import MessageFrame
 from django.utils import timezone
 
 from firehose.models import SubscriptionState
@@ -55,6 +57,9 @@ _INTERESTED_RECORDS = {
     models.ids.AppBskyFeedPost: models.AppBskyFeedPost,
     models.ids.AppBskyGraphFollow: models.AppBskyGraphFollow,
 }
+
+
+FIREHOSE_WORKERS_COUNT = int(os.getenv("FIREHOSE_WORKERS_COUNT", 2))
 
 
 class WatchDogTimeoutError(Exception):
@@ -175,7 +180,7 @@ class CommitOperations:
 
 
 def _get_ops_by_type(
-    commit: models.ComAtprotoSyncSubscribeRepos.Commit,
+    commit: Commit,
 ) -> CommitOperations:  # noqa: C901
     operation_by_type = CommitOperations()
 
@@ -264,75 +269,79 @@ async def signal_handler(client: AsyncFirehoseSubscribeReposClient) -> None:
     await client.stop()
 
 
-async def consumer_watchdog(
-    client: AsyncFirehoseSubscribeReposClient, base_uri: str
-) -> None:
+async def consumer_watchdog(base_uri: str) -> None:
     """Task that monitors the current cursor state and stops the client if it stalls.
 
     Args:
-        client (AsyncFirehoseSubscribeReposClient): The firehose client.
         base_uri (str): The base URI of the firehose service.
     """
     last_state, _ = await SubscriptionState.objects.aget_or_create(
         service=base_uri, defaults={"cursor": 0}
     )
+    consumer_sleep_time = 10
     while True:
-        await asyncio.sleep(60)
+        await asyncio.sleep(consumer_sleep_time)
         state = await SubscriptionState.objects.aget(service=base_uri)
         if not state.cursor > last_state.cursor:
             raise WatchDogTimeoutError("Firehose client has stalled.")
+
+        rate = (state.cursor - last_state.cursor) / consumer_sleep_time
+        logger.debug("Processing rate: %d/s", rate)
+
         last_state = state
 
 
 async def run(base_uri, operations_callback):
-    # initialize client and state
-    state, _ = await SubscriptionState.objects.aget_or_create(
-        service=base_uri, defaults={"cursor": 0}
-    )
+    with ProcessPoolExecutor(max_workers=FIREHOSE_WORKERS_COUNT) as executor:
+        loop = asyncio.get_running_loop()
+        # initialize client and state
+        state, _ = await SubscriptionState.objects.aget_or_create(
+            service=base_uri, defaults={"cursor": 0}
+        )
 
-    params = models.ComAtprotoSyncSubscribeRepos.Params(cursor=state.cursor)
+        params = models.ComAtprotoSyncSubscribeRepos.Params(cursor=state.cursor)
 
-    client = AsyncFirehoseSubscribeReposClient(params, base_uri=base_uri)
-    signal.signal(
-        signal.SIGINT, lambda _, __: asyncio.create_task(signal_handler(client))
-    )
+        client = AsyncFirehoseSubscribeReposClient(params, base_uri=base_uri)
+        signal.signal(
+            signal.SIGINT, lambda _, __: asyncio.create_task(signal_handler(client))
+        )
 
-    async def on_message_handler(message: "MessageFrame") -> None:
-        # Ensure there is a db connection since this is a long running process without a request context
-        #await sync_to_async(db.connection.connect)()
+        async def on_message_handler(message: MessageFrame) -> None:
+            # Ignore messages that are not commits
+            if message.type != "#commit" or "blocks" not in message.body:
+                return
 
-        # Ignore messages that are not commits
-        if message.type != "#commit" or "blocks" not in message.body:
-            return
+            try:
+                commit = await loop.run_in_executor(
+                    executor, parse_subscribe_repos_message, message
+                )
+            except ModelError as e:
+                logger.error("Failed to parse message: %s", str(message))
+                logger.error("Error: %s", e)
+                return
+
+            except Exception:  # pylint: disable=broad-except
+                logger.exception("Failed to parse message: %s", str(message))
+                return
+
+            # Update the cursor
+            await update_cursor(base_uri, commit.seq, client)
+
+            if (
+                not isinstance(commit, models.ComAtprotoSyncSubscribeRepos.Commit)
+                or not commit.blocks
+            ):
+                return
+
+            ops = _get_ops_by_type(commit)
+            await loop.run_in_executor(executor, operations_callback, ops)
 
         try:
-            commit = parse_subscribe_repos_message(message)
-        except ModelError as e:
-            logger.error("Failed to parse message: %s", str(message))
-            logger.error("Error: %s", e)
-            return
-
-        except Exception:  # pylint: disable=broad-except
-            logger.exception("Failed to parse message: %s", str(message))
-            return
-
-        # Update the cursor
-        await update_cursor(base_uri, commit.seq, client)
-
-        if (
-            not isinstance(commit, models.ComAtprotoSyncSubscribeRepos.Commit)
-            or not commit.blocks
-        ):
-            return
-
-        ops = _get_ops_by_type(commit)
-        await operations_callback(ops)
-    try:
-        async with asyncio.TaskGroup() as group:
-            # Spawn the client and watchdog tasks
-            group.create_task(client.start(on_message_handler))
-            group.create_task(consumer_watchdog(client, base_uri))
-    except (FirehoseError, WatchDogTimeoutError) as e:
-        logger.warning("Firehose consumer has terminated due to en error: %s", e)
+            async with asyncio.TaskGroup() as group:
+                # Spawn the client and watchdog tasks
+                group.create_task(client.start(on_message_handler))
+                group.create_task(consumer_watchdog(base_uri))
+        except (FirehoseError, WatchDogTimeoutError) as e:
+            logger.warning("Firehose consumer has terminated due to en error: %s", e)
 
     logger.info("Shutting down firehose client")

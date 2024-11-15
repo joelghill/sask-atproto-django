@@ -1,6 +1,5 @@
 import logging
 import re
-from asyncio import TaskGroup
 from datetime import datetime, timedelta, timezone
 from typing import Iterable, List
 
@@ -61,20 +60,19 @@ def flatlanders_handler(limit: int = 50, cursor: str | None = None):
     }
 
 
-async def index_commit_operations(commits: CommitOperations):
+def index_commit_operations(commits: CommitOperations):
     """Update indexed posts and author records from a commit operations object.
 
     Args:
         commits (CommitOperations): Repro operations to index
     """
-    async with TaskGroup() as tg:
-        tg.create_task(_process_created_posts(commits.posts.created))
-        tg.create_task(_process_deleted_posts(commits.posts.deleted))
-        tg.create_task(_process_created_follows(commits.follows.created))
-        tg.create_task(_process_deleted_follows(commits.follows.deleted))
+    _process_created_posts(commits.posts.created)
+    _process_created_follows(commits.follows.created)
+    _process_deleted_posts(commits.posts.deleted)
+    _process_deleted_follows(commits.follows.deleted)
 
 
-async def _process_created_posts(
+def _process_created_posts(
     created_posts: Iterable[CreatedRecordOperation[MainPost]],
 ):
     """Indexes a post from a commit operations object.
@@ -90,7 +88,7 @@ async def _process_created_posts(
     """
     author_dids = [post.author_did for post in created_posts]
     author_dict = {}
-    async for author in RegisteredUser.objects.filter(did__in=author_dids):
+    for author in RegisteredUser.objects.filter(did__in=author_dids):
         author_dict[author.did] = author
 
     for post in created_posts:
@@ -108,43 +106,43 @@ async def _process_created_posts(
             # If we don't have an author, create one
             if not author:
                 logger.debug("Creating new author: %s", post.author_did)
-                author = await RegisteredUser.objects.acreate(did=post.author_did)
+                author = RegisteredUser.objects.create(did=post.author_did)
                 logger.info("New author registered: %s", author.did)
 
             logger.info("Indexing post from keyword match")
-            await Post.from_post_record(post, is_sask_post, author)
+            Post.from_post_record(post, is_sask_post, author)
 
         elif author and author.is_active():
             logger.debug("Post from registered author: %s", post.record_text)
             # Replies to non-indexed posts are ignored
             if (
                 post.record_reply
-                and not await Post.objects.filter(uri=post.record_reply).aexists()
+                and not Post.objects.filter(uri=post.record_reply).exists()
             ):
                 continue
             logger.info("Indexing post from registered author: %s", post.record_text)
-            await Post.from_post_record(post, is_sask_post, author)
+            Post.from_post_record(post, is_sask_post, author)
 
 
-async def _process_deleted_posts(uris: List[str]):
+def _process_deleted_posts(uris: List[str]):
     """Deletes a post from the database"""
     if uris:
-        await Post.objects.filter(uri__in=uris).adelete()
+        Post.objects.filter(uri__in=uris).delete()
 
 
-async def _process_created_follows(follows: List[CreatedRecordOperation[MainFollow]]):
+def _process_created_follows(follows: List[CreatedRecordOperation[MainFollow]]):
     """If you follow the feed admin, you are added to the feed"""
     for follow in follows:
         if follow.record_subject_uri == FEEDGEN_ADMIN_DID:
             logger.info("User followed feed admin: %s", follow.author_did)
-            await Follow.objects.aget_or_create(
+            Follow.objects.get_or_create(
                 uri=follow.uri,
                 cid=follow.cid,
                 subject=follow.record_subject_uri,
                 author=follow.author_did,
             )
 
-            user, created = await RegisteredUser.objects.aget_or_create(
+            user, created = RegisteredUser.objects.get_or_create(
                 did=follow.author_did, defaults={"expires_at": None}
             )
 
@@ -153,22 +151,22 @@ async def _process_created_follows(follows: List[CreatedRecordOperation[MainFoll
             else:
                 logger.info("User re-registered: %s", follow.author_did)
                 user.expires_at = None
-                await user.asave()
+                user.save()
             logger.info(
                 "Registering user: %s",
                 follow.author_did,
             )
 
 
-async def _process_deleted_follows(unfollows: List[str]):
+def _process_deleted_follows(unfollows: List[str]):
     """If you unfollow the feed admin, you are removed from the feed"""
     for unfollow in unfollows:
-        record = await Follow.objects.filter(uri=unfollow).afirst()
+        record = Follow.objects.filter(uri=unfollow).first()
         if record:
-            await record.adelete()
+            record.delete()
             yesterday = datetime.now(timezone.utc) - timedelta(days=1)
             if record.subject == FEEDGEN_ADMIN_DID:
-                await RegisteredUser.objects.filter(did=record.author).aupdate(
+                RegisteredUser.objects.filter(did=record.author).update(
                     expires_at=yesterday
                 )
                 logger.info("User expired via unfollow: %s", record.author)
