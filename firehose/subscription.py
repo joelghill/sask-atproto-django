@@ -175,7 +175,7 @@ async def consumer_watchdog(base_uri: str) -> None:
         last_state = state
 
 
-async def run(base_uri, operations_callback):
+async def run_firehose(base_uri, operations_callback):
     with ProcessPoolExecutor(max_workers=FIREHOSE_WORKERS_COUNT) as executor:
         loop = asyncio.get_running_loop()
         # initialize client and state
