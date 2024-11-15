@@ -114,7 +114,7 @@ else:
             "PASSWORD": FEEDGEN_DB_PASSWORD,
             "HOST": FEEDGEN_DB_HOST,
             "PORT": FEEDGEN_DB_PORT,
-            "CONN_MAX_AGE": 0,
+            "CONN_MAX_AGE": 600,
             "DISABLE_SERVER_SIDE_CURSORS": True,
             "OPTIONS": {
                 "sslmode": FEEDGEN_DB_SSL_MODE,

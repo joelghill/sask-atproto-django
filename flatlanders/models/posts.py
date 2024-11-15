@@ -62,7 +62,7 @@ class Post(Record):
     is_community_match = models.BooleanField(default=False)
 
     @classmethod
-    async def from_post_record(
+    def from_post_record(
         cls,
         post_record: CreatedRecordOperation[MainPost],
         is_community_match: bool,
@@ -79,7 +79,7 @@ class Post(Record):
             Post: The post instance
         """
         try:
-            await cls.objects.acreate(
+            cls.objects.create(
                 uri=post_record.uri,
                 cid=str(post_record.cid),
                 author=author,
