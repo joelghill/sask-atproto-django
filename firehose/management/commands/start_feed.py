@@ -4,7 +4,8 @@ import logging
 import uvloop
 from django.core.management.base import BaseCommand
 
-from firehose.subscription import CommitOperations, run
+from firehose.jetstream import JetStreamClient
+from firehose.subscription import CommitOperations
 from flatlanders.algorithms.flatlanders_feed import index_commit_operations
 
 logger = logging.getLogger("feed")
@@ -34,11 +35,12 @@ class Command(BaseCommand):
         )
 
     def handle(self, *args, **options):
-        operations_callback = None
-        if options["algorithm"] == "logger":
-            operations_callback = log_post
-        elif options["algorithm"] == "flatlanders":
-            operations_callback = index_commit_operations
+        # operations_callback = None
+        # if options["algorithm"] == "logger":
+        #     operations_callback = log_post
+        # elif options["algorithm"] == "flatlanders":
+        #     operations_callback = index_commit_operations
 
         with asyncio.Runner(loop_factory=uvloop.new_event_loop) as runner:
-            runner.run(run(options["service"], operations_callback))
+            client = JetStreamClient()
+            runner.run(client.start())

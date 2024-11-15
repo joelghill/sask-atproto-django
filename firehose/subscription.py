@@ -2,31 +2,26 @@ import asyncio
 import logging
 import signal
 import typing as t
-from datetime import datetime
 
 import sentry_sdk
 from asgiref.sync import sync_to_async
 from atproto import (
     CAR,
-    CID,
     AsyncFirehoseSubscribeReposClient,
     AtUri,
     models,
     parse_subscribe_repos_message,
 )
 from atproto_client.exceptions import ModelError
-from atproto_client.models.app.bsky.feed.like import Record as Like
 from atproto_client.models.app.bsky.feed.post import Record as Post
-from atproto_client.models.app.bsky.feed.repost import Record as Repost
 from atproto_client.models.app.bsky.graph.follow import Record as Follow
 from atproto_client.models.dot_dict import DotDict
 from atproto_client.models.unknown_type import UnknownRecordType
 from atproto_client.models.utils import get_or_create, is_record_type
 from atproto_firehose.exceptions import FirehoseError
 from django import db
-from django.utils import timezone
 
-from firehose.models import SubscriptionState
+from firehose.models import CommitOperations, CreatedRecordOperation, SubscriptionState
 from firehose.settings import INDEXER_SENTRY_DNS
 
 logger = logging.getLogger("feed")
@@ -61,117 +56,6 @@ class WatchDogTimeoutError(Exception):
     """Raised when the watchdog detects a stall."""
 
     pass
-
-
-class CreatedRecordOperation(t.Generic[T]):
-    """Represents a record that was created in a user's repo."""
-
-    record: T | DotDict
-    uri: str
-    cid: CID
-    author_did: str
-
-    def __init__(self, record: T, uri: str, cid: CID, author: str) -> None:
-        self.record = record
-        self.uri = uri
-        self.cid = cid
-        self.author_did = author
-
-    @property
-    def record_created_at(self) -> datetime:
-        """Returns the created_at date of the record."""
-        # If the record does not have a created_at field, return the current time
-        if not hasattr(self.record, "created_at"):
-            return timezone.now()
-
-        datetime_value = self.record.created_at
-        try:
-            # Convert to date if string
-            if datetime_value and isinstance(datetime_value, str):
-                return datetime.fromisoformat(datetime_value)
-            elif datetime_value and isinstance(datetime_value, datetime):
-                return datetime_value  # TODO: It should be a string.
-            else:
-                return timezone.now()
-
-        except ValueError:
-            logger.error(
-                "Invalid datetime value string: %s", datetime_value, exc_info=True
-            )
-            return timezone.now()
-
-    @property
-    def record_subject_uri(self) -> str | None:
-        """Returns the subject of the record, if it has one."""
-        if isinstance(self.record, dict):
-            return self.record.get("subject", {}).get("uri")
-        if not isinstance(self.record, Post) and self.record.subject:
-            if isinstance(self.record.subject, str):
-                return self.record.subject
-            else:
-                return self.record.subject.uri
-        return None
-
-    @property
-    def record_text(self) -> str:
-        """Returns the text of the record, if it has one."""
-        if isinstance(self.record, dict):
-            return self.record.get("text", "")
-        return self.record.text  # type: ignore
-
-    @property
-    def record_reply(self) -> str | None:
-        """Returns the reply of the record, if it has one."""
-        if isinstance(self.record, dict):
-            return self.record.get("reply", {}).get("parent", {}).get("uri")
-        if (
-            isinstance(self.record, Post)
-            and self.record.reply
-            and self.record.reply.parent.uri
-        ):
-            return self.record.reply.parent.uri
-
-        return None
-
-    @property
-    def record_reply_root(self) -> str | None:
-        """Returns the root reply of the record, if it has one."""
-        if isinstance(self.record, dict):
-            return self.record.get("reply", {}).get("root", {}).get("uri")
-        if (
-            isinstance(self.record, Post)
-            and self.record.reply
-            and self.record.reply.root.uri
-        ):
-            return self.record.reply.root.uri
-
-        return None
-
-
-class RecordOperations(t.Generic[T]):
-    """Represents a collection of operations on a specific record type."""
-
-    created: t.List[CreatedRecordOperation[T]]
-    deleted: t.List[str]
-
-    def __init__(self):
-        self.created = []
-        self.deleted = []
-
-
-class CommitOperations:
-    """Represents a collection of operations on different record types."""
-
-    posts: RecordOperations[Post]
-    reposts: RecordOperations[Repost]
-    likes: RecordOperations[Like]
-    follows: RecordOperations[Follow]
-
-    def __init__(self):
-        self.posts = RecordOperations[Post]()
-        self.reposts = RecordOperations[Repost]()
-        self.follows = RecordOperations[Follow]()
-        self.likes = RecordOperations[Like]()
 
 
 def _get_ops_by_type(
@@ -326,6 +210,7 @@ async def run(base_uri, operations_callback):
 
         ops = _get_ops_by_type(commit)
         await operations_callback(ops)
+
     try:
         async with asyncio.TaskGroup() as group:
             # Spawn the client and watchdog tasks
