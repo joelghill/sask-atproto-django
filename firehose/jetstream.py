@@ -70,7 +70,7 @@ class JetStreamClient:
         self,
         cursor: int | None = None,
         max_reconnect_delay: int = 64,
-        max_queue_size: int = 16,
+        max_queue_size: int = 300,
         message_callback: OnMessageCallback | None = None,
         error_callback: OnCallbackErrorCallback | None = None,
     ) -> None:
@@ -179,7 +179,7 @@ async def consumer_watchdog(client: JetStreamClient) -> None:
     """
     last_cursor = client.cursor or 0
     last_count = JetStreamClient.event_counter
-    consumer_sleep_time = 10
+    consumer_sleep_time = 60
     while True:
         await asyncio.sleep(consumer_sleep_time)
         cursor = client.cursor or 0
@@ -212,7 +212,7 @@ def _create_post(author: RegisteredUser, post: dict[str, Any]) -> Post:
     return Post.objects.create(
         uri=uri,
         cid=str(post["commit"]["cid"]),
-        author=post["did"],
+        author=author,
         text=post["commit"]["record"]["text"],
         created_at=datetime.fromisoformat(post["commit"]["record"]["createdAt"]),
         reply_parent=post["commit"]["record"]
@@ -224,7 +224,6 @@ def _create_post(author: RegisteredUser, post: dict[str, Any]) -> Post:
         .get("root", {})
         .get("uri"),
     )
-
 
 def _process_created_post(
     post_event: dict[str, Any],
@@ -346,8 +345,6 @@ def _process_event(event: dict[str, Any]) -> None:
 async def run_jetstream():
     with ProcessPoolExecutor(max_workers=FIREHOSE_WORKERS_COUNT) as executor:
         loop = asyncio.get_running_loop()
-        # initialize client and state
-
         cursor = await _get_cursor()
 
         async def on_event_handler(event: dict[str, Any]) -> None:

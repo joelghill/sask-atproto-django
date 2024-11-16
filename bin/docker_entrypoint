@@ -10,7 +10,7 @@ start_server() {
 
 start_indexer() {
     echo "Starting indexer..."
-    exec /app/.venv/bin/python manage.py start_feed "wss://bsky.network/xrpc" --algorithm=flatlanders
+    exec /app/.venv/bin/python manage.py start_feed
 }
 
 start_labeler() {

@@ -23,9 +23,7 @@
             "request": "launch",
             "program": "${workspaceFolder}/manage.py",
             "args": [
-                "start_feed",
-                "wss://bsky.network/xrpc",
-                "--algorithm=flatlanders"
+                "start_feed"
             ],
             "django": true,
             "justMyCode": false
@@ -53,6 +51,5 @@
             "django": true,
             "justMyCode": false
         }
-
     ]
 }
