@@ -35,7 +35,7 @@ PUBLIC_HOSTS = [
 ]
 
 WANTED_COLLECTIONS = [
-    "app.bsky.graph.follow",
+    #"app.bsky.graph.follow",
     "app.bsky.feed.post",
 ]
 
