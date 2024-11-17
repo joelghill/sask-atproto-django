@@ -70,7 +70,7 @@ class JetStreamClient:
         self,
         cursor: int | None = None,
         max_reconnect_delay: int = 64,
-        max_queue_size: int = 300,
+        max_queue_size: int = 500,
         message_callback: OnMessageCallback | None = None,
         error_callback: OnCallbackErrorCallback | None = None,
     ) -> None:
@@ -164,11 +164,12 @@ class JetStreamClient:
 
 
 async def _get_cursor() -> int:
-    try:
-        latest_post = await Post.objects.alatest("indexed_at")
-        return int(latest_post.created_at.timestamp() * 1000)  # type: ignore
-    except Post.DoesNotExist:
-        return 0
+    #try:
+        #latest_post = await Post.objects.alatest("indexed_at")
+        #return int(latest_post.created_at.timestamp() * 1000)  # type: ignore
+    #except Post.DoesNotExist:
+        #return 0
+    return 0
 
 
 async def consumer_watchdog(client: JetStreamClient) -> None:
