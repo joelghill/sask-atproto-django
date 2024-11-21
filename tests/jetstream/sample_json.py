@@ -21,7 +21,7 @@ REPLY_POST = {
                     "uri": "at://did:plc:oamcq4k7hlvmy76nurpl2vdh/app.bsky.feed.post/3lawvol3nfk2f",
                 },
             },
-            "text": "Far too qualified and intelligent",
+            "text": "This is an example post containing a Saskatchewan keyword.",
         },
         "cid": "bafyreifsghszkqvli53yj7v43sgbacqaq6lck73otcradmwrsv5scb22fu",
     },
