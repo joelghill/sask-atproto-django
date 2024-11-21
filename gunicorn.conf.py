@@ -2,7 +2,6 @@
 Configures the gunicorn server for SolusGuard services.
 """
 import os
-import multiprocessing
 
 loglevel = os.environ.get('GUNICORN_LOG_LEVEL', 'info')
 errorlog = os.environ.get('GUNICORN_ERROR_LOG', '-')

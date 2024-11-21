@@ -1,180 +1,123 @@
 import logging
 import re
-from datetime import datetime, timedelta, timezone
-from typing import Iterable, List
+from datetime import datetime, timezone
+from typing import Any
 
-from atproto_client.models.app.bsky.feed.post import Record as MainPost
-from atproto_client.models.app.bsky.graph.follow import Record as MainFollow
-
-from firehose.subscription import CommitOperations, CreatedRecordOperation
+from common.models import FeedAlgorithm, JetstreamEventOps, JetstreamEventWrapper
 from flatlanders.algorithms.errors import InvalidCursorError
-from flatlanders.keywords import SASK_WORDS
-from flatlanders.models.posts import Follow, Post
+from flatlanders.keywords import SASK_WORDS, is_sask_text
+from flatlanders.models.posts import Post
 from flatlanders.models.users import RegisteredUser
-from flatlanders.settings import FEEDGEN_ADMIN_DID, FEEDGEN_URI
 
 logger = logging.getLogger("feed")
 
-compiled_patterns = [re.compile(rf"\b{word}\b") for word in SASK_WORDS]
+COMPILED_PATTERNS = [re.compile(rf"\b{word}\b") for word in SASK_WORDS]
 
 
-def flatlanders_handler(limit: int = 50, cursor: str | None = None):
-    """Return the feed skeleton for the flatlanders algorithm"""
-    try:
-        indexed_at: datetime | None = None
-        if cursor:
-            logger.debug("Incoming cursor: %s", cursor)
-            (indexed_at_timestamp, cid) = cursor.split("::")
-            if not indexed_at_timestamp or not cid:
-                raise InvalidCursorError(f"Malformed cursor: {cursor}")
+class FlatlandersAlgorithm(FeedAlgorithm):
+    """Implementation of an algorithm for the flatlanders feed"""
 
-            indexed_at = datetime.fromtimestamp(
-                float(indexed_at_timestamp), timezone.utc
-            )
+    def __init__(self) -> None:
+        self._wanted_dids = []
+        self._wanted_collections = ["app.bsky.feed.post"]
 
-            posts = Post.objects.filter(created_at__lt=indexed_at).order_by(
-                "-created_at"
-            )[:limit]
-        else:
-            posts = Post.objects.order_by("-created_at")[:limit]
+    @property
+    def wanted_collections(self) -> list[str]:
+        return self._wanted_collections
 
-        feed = [{"post": post.uri} for post in posts]
+    @property
+    def wanted_dids(self) -> list[str]:
+        return self._wanted_dids
 
-        if posts:
-            last = list(posts)[-1]
-            if last.created_at:
-                cursor = f"{last.created_at.timestamp()}::{last.cid}"
+    @property
+    def name(self) -> str:
+        return "flatlanders_jetstream"
+
+    def get_feed(self, cursor: str | None, limit: int) -> dict[str, Any]:
+        """Return the feed skeleton for the flatlanders algorithm.
+
+        A chronological feed of posts that have been indexed by the algorithm.
+        """
+        try:
+            indexed_at: datetime | None = None
+            if cursor:
+                logger.debug("Incoming cursor: %s", cursor)
+                (indexed_at_timestamp, cid) = cursor.split("::")
+                if not indexed_at_timestamp or not cid:
+                    raise InvalidCursorError(f"Malformed cursor: {cursor}")
+
+                indexed_at = datetime.fromtimestamp(
+                    float(indexed_at_timestamp), timezone.utc
+                )
+
+                posts = Post.objects.filter(created_at__lt=indexed_at).order_by(
+                    "-created_at"
+                )[:limit]
             else:
-                cursor = f"{last.indexed_at.timestamp()}::{last.cid}"
-        else:
-            # No more posts, no cursor. Must be empty string
-            cursor = ""
+                posts = Post.objects.order_by("-created_at")[:limit]
 
-        logger.debug("Outgoing cursor: %s", cursor)
-    except Exception as error:
-        logger.error("Error in flatlanders handler: %s", error, exc_info=True)
-        raise error
-    return {
-        "cursor": cursor,
-        "feed": feed,
-    }
+            feed = [{"post": post.uri} for post in posts]
 
+            if posts:
+                last = list(posts)[-1]
+                if last.created_at:
+                    cursor = f"{last.created_at.timestamp()}::{last.cid}"
+                else:
+                    cursor = f"{last.indexed_at.timestamp()}::{last.cid}"
+            else:
+                # No more posts, no cursor. Must be empty string
+                cursor = ""
 
-def index_commit_operations(commits: CommitOperations):
-    """Update indexed posts and author records from a commit operations object.
+            logger.debug("Outgoing cursor: %s", cursor)
+        except Exception as error:
+            logger.error("Error in flatlanders handler: %s", error, exc_info=True)
+            raise error
+        return {
+            "cursor": cursor,
+            "feed": feed,
+        }
 
-    Args:
-        commits (CommitOperations): Repro operations to index
-    """
-    _process_created_posts(commits.posts.created)
-    _process_created_follows(commits.follows.created)
-    _process_deleted_posts(commits.posts.deleted)
-    _process_deleted_follows(commits.follows.deleted)
+    async def process_event(self, event: JetstreamEventWrapper) -> None:
+        if event.collection == "app.bsky.feed.post":
+            if event.operation == JetstreamEventOps.CREATE:
+                await self._process_created_post(event)
+            elif event.operation == JetstreamEventOps.DELETE:
+                await self._process_deleted_post(event)
 
+    async def _process_created_post(self, event: JetstreamEventWrapper) -> None:
+        """Indexes a post from a commit operations object.
 
-def _process_created_posts(
-    created_posts: Iterable[CreatedRecordOperation[MainPost]],
-):
-    """Indexes a post from a commit operations object.
+        Args:
+            event: The Jetstream event wrapper object.
+        """
+        record_text = event.text
 
-    1. Check as to whether or not the record text contains an SK keyword
-    2. Attempts to get the author of the post from the commit operations object from the
-      database.
-    3. If we have an author, and they are active, save the post to the database.
-    4. If we have an author, and they are not active, but the text conatins sask, save
-       the post to the database and update the author record
-    5. If we do not have an author, but the text contains sask, save the post to the
-       database and create the author record.
-    """
-    author_dids = [post.author_did for post in created_posts]
-    author_dict = {}
-    for author in RegisteredUser.objects.filter(did__in=author_dids):
-        author_dict[author.did] = author
-
-    for post in created_posts:
-        # Get the text of the post and check if it contains an SK keyword
-        is_sask_post = is_sask_text(post.record_text)
         # Check if the author is in the dictionary
-        author = author_dict.get(post.author_did)
-        # If the post is not a sask post, and we don't have an author, skip it
-        if not author and not is_sask_post:
-            continue
+        author = await RegisteredUser.objects.filter(did=event.author).afirst()
 
-        # If we have a sask post, update the author record
+        # Get the text of the post and check if it contains an SK keyword
+        is_sask_post = False
+        if record_text:
+            is_sask_post = is_sask_text(record_text)
+
+        # Index post from keyword match
         if is_sask_post:
-            logger.debug("Post contains SK keyword: %s", post.record_text)
-            # If we don't have an author, create one
-            if not author:
-                logger.debug("Creating new author: %s", post.author_did)
-                author = RegisteredUser.objects.create(did=post.author_did)
-                logger.info("New author registered: %s", author.did)
-
             logger.info("Indexing post from keyword match")
-            Post.from_post_record(post, is_sask_post, author)
+            await Post.afrom_event(event, is_community_match=True, author=author)
 
-        elif author and author.is_active():
-            logger.debug("Post from registered author: %s", post.record_text)
+        elif author:
             # Replies to non-indexed posts are ignored
             if (
-                post.record_reply
-                and not Post.objects.filter(uri=post.record_reply).exists()
+                event.reply_parent
+                and not await Post.objects.filter(uri=event.reply_parent).aexists()
             ):
-                continue
-            logger.info("Indexing post from registered author: %s", post.record_text)
-            Post.from_post_record(post, is_sask_post, author)
+                return
 
+            # Index post from registered author
+            logger.info("Indexing post from registered author: %s", record_text)
+            await Post.afrom_event(event, is_community_match=True, author=author)
 
-def _process_deleted_posts(uris: List[str]):
-    """Deletes a post from the database"""
-    if uris:
-        Post.objects.filter(uri__in=uris).delete()
-
-
-def _process_created_follows(follows: List[CreatedRecordOperation[MainFollow]]):
-    """If you follow the feed admin, you are added to the feed"""
-    for follow in follows:
-        if follow.record_subject_uri == FEEDGEN_ADMIN_DID:
-            logger.info("User followed feed admin: %s", follow.author_did)
-            Follow.objects.get_or_create(
-                uri=follow.uri,
-                cid=follow.cid,
-                subject=follow.record_subject_uri,
-                author=follow.author_did,
-            )
-
-            user, created = RegisteredUser.objects.get_or_create(
-                did=follow.author_did, defaults={"expires_at": None}
-            )
-
-            if created:
-                logger.info("New user registered: %s", follow.author_did)
-            else:
-                logger.info("User re-registered: %s", follow.author_did)
-                user.expires_at = None
-                user.save()
-            logger.info(
-                "Registering user: %s",
-                follow.author_did,
-            )
-
-
-def _process_deleted_follows(unfollows: List[str]):
-    """If you unfollow the feed admin, you are removed from the feed"""
-    for unfollow in unfollows:
-        record = Follow.objects.filter(uri=unfollow).first()
-        if record:
-            record.delete()
-            yesterday = datetime.now(timezone.utc) - timedelta(days=1)
-            if record.subject == FEEDGEN_ADMIN_DID:
-                RegisteredUser.objects.filter(did=record.author).update(
-                    expires_at=yesterday
-                )
-                logger.info("User expired via unfollow: %s", record.author)
-
-
-def is_sask_text(text: str) -> bool:
-    lower_text = text.lower()
-    return any(pattern.search(lower_text) for pattern in compiled_patterns)
-
-
-ALGORITHMS = {FEEDGEN_URI: flatlanders_handler}
+    async def _process_deleted_post(self, event: JetstreamEventWrapper):
+        """Deletes a post from the database"""
+        if event.uri:
+            await Post.objects.filter(uri=event.uri).adelete()

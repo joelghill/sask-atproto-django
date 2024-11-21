@@ -1,18 +1,30 @@
 import asyncio
 import logging
 
+import sentry_sdk
 import uvloop
 from django.core.management.base import BaseCommand
 
-from firehose.jetstream import run_jetstream
-from firehose.subscription import CommitOperations
+from firehose.main import run_jetstream
+from firehose.settings import INDEXER_SENTRY_DNS
 
 logger = logging.getLogger("feed")
 
+# Initialize Sentry
+if INDEXER_SENTRY_DNS:
+    sentry_sdk.init(
+        dsn=INDEXER_SENTRY_DNS,
+        # Set traces_sample_rate to 1.0 to capture 100%
+        # of transactions for tracing.
+        traces_sample_rate=1.0,
+        # Set profiles_sample_rate to 1.0 to profile 100%
+        # of sampled transactions.
+        # We recommend adjusting this value in production.
+        profiles_sample_rate=1.0,
+    )
 
-async def log_post(commits: CommitOperations):
-    for post in commits.posts.created:
-        print(f"[{post.record.created_at}]: {post.record_text}")  # type: ignore
+
+POSTS_COLLECTION = "app.bsky.feed.post"
 
 
 class Command(BaseCommand):

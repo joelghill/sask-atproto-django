@@ -1,7 +1,6 @@
 """Admin classes for flatlanders app"""
 
 from django.contrib import admin
-from django.db.models.query import QuerySet
 
 from flatlanders.models.labelers import LabelerCursorState
 from flatlanders.models.posts import Post
@@ -29,18 +28,12 @@ class RegisteredUserAdmin(admin.ModelAdmin):
         "did",
         "indexed_at",
         "last_updated",
-        "expires_at",
     )
 
     search_fields = ("did",)
-    actions = ["make_registered"]
-
-    @admin.action(description="Mark selected users as registered")
-    def make_registered(self, request, queryset: QuerySet[RegisteredUser]):
-        queryset.update(expires_at=None)
 
 
-class labelerCursorStateAdmin(admin.ModelAdmin):
+class LabelerCursorStateAdmin(admin.ModelAdmin):
     """Admin class for labelerCursorState"""
 
     list_display = (
@@ -53,4 +46,4 @@ class labelerCursorStateAdmin(admin.ModelAdmin):
 
 admin.site.register(Post, PostAdmin)
 admin.site.register(RegisteredUser, RegisteredUserAdmin)
-admin.site.register(LabelerCursorState, labelerCursorStateAdmin)
+admin.site.register(LabelerCursorState, LabelerCursorStateAdmin)

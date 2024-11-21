@@ -3,5 +3,16 @@
         "tests"
     ],
     "python.testing.unittestEnabled": false,
-    "python.testing.pytestEnabled": true
+    "python.testing.pytestEnabled": true,
+    "cSpell.words": [
+        "afrom",
+        "atproto",
+        "bsky",
+        "dids",
+        "FEEDGEN",
+        "Flatlander",
+        "flatlanders",
+        "Jetstream",
+        "xrpc"
+    ]
 }

@@ -1,4 +1,6 @@
-from flatlanders.algorithms.flatlanders_feed import flatlanders_handler
+from flatlanders.algorithms.flatlanders_feed import FlatlandersAlgorithm
 from flatlanders.settings import FEEDGEN_URI
 
-ALGORITHMS = {FEEDGEN_URI: flatlanders_handler}
+__FLATLANDERS = FlatlandersAlgorithm()
+
+ALGORITHMS = {FEEDGEN_URI: __FLATLANDERS.get_feed}

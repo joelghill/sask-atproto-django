@@ -9,7 +9,8 @@ start_server() {
 }
 
 start_indexer() {
-    echo "Starting indexer..."
+    echo "Starting posts indexer..."
+    /app/.venv/bin/python manage.py migrate
     exec /app/.venv/bin/python manage.py start_feed
 }
 
@@ -19,18 +20,9 @@ start_labeler() {
     exec /app/.venv/bin/python manage.py start_labeler
 }
 
-start_nginx() {
-    echo "Starting server..."
-    /app/.venv/bin/python manage.py migrate
-    exec nginx -g "daemon off;"
-}
-
 case $1 in
 server)
     start_server
-    ;;
-server)
-    start_nginx
     ;;
 indexer)
     start_indexer
@@ -39,7 +31,7 @@ labeler)
     start_labeler
     ;;
 *)
-    echo "Usage: $0 {server|indexer|labeler|nginx}"
+    echo "Usage: $0 {server|indexer|labeler}"
     exit 1
     ;;
 esac

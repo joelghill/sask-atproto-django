@@ -5,7 +5,7 @@ import logging
 from atproto_client.models.app.bsky.feed.post import Record as MainPost
 from django.db import models
 
-from firehose.subscription import CreatedRecordOperation
+from common.models import JetstreamEventWrapper
 from flatlanders.models.users import RegisteredUser
 
 logger = logging.getLogger("feed")
@@ -40,12 +40,17 @@ class Post(Record):
 
     # The CID of the post
     cid = models.CharField(max_length=255)
-    # Author of the post. Relationship to RegsiteredUser
+    # Author of the post. Relationship to registered User
     author = models.ForeignKey(
-        "RegisteredUser", on_delete=models.CASCADE, related_name="posts"
+        "RegisteredUser",
+        on_delete=models.SET_NULL,
+        related_name="posts",
+        null=True,
+        blank=True,
     )
+    author_did = models.CharField(max_length=255, null=True)  # noqa: DJ001
     # Post text
-    text = models.TextField()
+    text = models.TextField(blank=True)
     # The parent of the post
     reply_parent = models.CharField(max_length=255, null=True)  # noqa: DJ001
     # The root of the post
@@ -62,11 +67,11 @@ class Post(Record):
     is_community_match = models.BooleanField(default=False)
 
     @classmethod
-    def from_post_record(
+    async def afrom_event(
         cls,
-        post_record: CreatedRecordOperation[MainPost],
+        post_record: JetstreamEventWrapper,
         is_community_match: bool,
-        author: RegisteredUser,
+        author: RegisteredUser | None = None,
     ):
         """Creates a Post object from a firehose record.
 
@@ -79,14 +84,15 @@ class Post(Record):
             Post: The post instance
         """
         try:
-            cls.objects.create(
+            await cls.objects.acreate(
                 uri=post_record.uri,
                 cid=str(post_record.cid),
                 author=author,
-                text=post_record.record_text,
-                created_at=post_record.record_created_at,
-                reply_parent=post_record.record_reply,
-                reply_root=post_record.record_reply_root,
+                author_did=post_record.author,
+                text=post_record.text,
+                created_at=post_record.created_at,
+                reply_parent=post_record.reply_parent,
+                reply_root=post_record.reply_root,
                 is_community_match=is_community_match,
             )
         except Exception as error:
