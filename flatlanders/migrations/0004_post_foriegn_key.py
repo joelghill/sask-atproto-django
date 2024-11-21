@@ -3,14 +3,6 @@ import django.db.models.deletion
 from django.db import migrations, models
 
 
-def clear_add_author_dids(apps, schema_editor):
-    """Delete all users that are not registered"""
-    Post = apps.get_model("flatlanders", "Post")
-    for post in Post.objects.filter(author__isnull=False):
-        post.author_did = post.author.did
-        post.save()
-
-
 class Migration(migrations.Migration):
     dependencies = [  # noqa: RUF012
         ("flatlanders", "0003_labellercursorstate"),
@@ -27,14 +19,4 @@ class Migration(migrations.Migration):
                 to="flatlanders.registereduser",
             ),
         ),
-        migrations.RemoveField(
-            model_name="registereduser",
-            name="expires_at",
-        ),
-        migrations.AddField(
-            model_name="post",
-            name="author_did",
-            field=models.CharField(max_length=255, null=True),
-        ),
-        migrations.RunPython(clear_add_author_dids),
     ]

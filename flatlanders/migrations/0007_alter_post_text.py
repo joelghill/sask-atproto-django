@@ -6,7 +6,7 @@ from django.db import migrations, models
 class Migration(migrations.Migration):
 
     dependencies = [
-        ('flatlanders', '0004_remove_registereduser_expires_at_post_author_did_and_more'),
+        ('flatlanders', '0006_remove_registereduser_expires_at_post_author_did_and_more'),
     ]
 
     operations = [
