@@ -2,7 +2,6 @@
 
 import logging
 
-from atproto_client.models.app.bsky.feed.post import Record as MainPost
 from django.db import models
 
 from common.models import JetstreamEventWrapper

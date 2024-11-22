@@ -2,7 +2,7 @@
 
 import abc
 import logging
-from datetime import datetime
+from datetime import UTC, datetime
 from enum import StrEnum
 from typing import Any
 
@@ -44,13 +44,7 @@ class JetstreamEventWrapper:
         else:
             self._operation = JetstreamEventOps.UNKNOWN
 
-        self._created_at = None
-        if (
-            self.kind == JetstreamEventKinds.COMMIT
-            and self._operation == JetstreamEventOps.CREATE
-        ):
-            iso = self._event["commit"]["record"].get("createdAt")
-            self._created_at = datetime.fromisoformat(iso)
+        self._created_at = datetime.fromtimestamp(self._event["time_us"]/1000000, tz=UTC)
 
     @property
     def timestamp(self) -> float:
