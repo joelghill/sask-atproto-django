@@ -44,7 +44,11 @@ class JetstreamEventWrapper:
         else:
             self._operation = JetstreamEventOps.UNKNOWN
 
-        self._created_at = datetime.fromtimestamp(self._event["time_us"]/1000000, tz=UTC)
+        created_at = self._event.get("commit").get("record").get("createdAt")
+        if created_at:
+            self._created_at = datetime.fromisoformat(created_at)
+        else:
+            self._created_at = datetime.fromtimestamp(self._event["time_us"]/1000000, tz=UTC)
 
     @property
     def timestamp(self) -> float:
