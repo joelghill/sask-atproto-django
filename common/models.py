@@ -44,7 +44,7 @@ class JetstreamEventWrapper:
         else:
             self._operation = JetstreamEventOps.UNKNOWN
 
-        created_at = self._event.get("commit").get("record").get("createdAt")
+        created_at = self._event.get("commit", {}).get("record", {}).get("createdAt")
         if created_at:
             self._created_at = datetime.fromisoformat(created_at)
         else:
