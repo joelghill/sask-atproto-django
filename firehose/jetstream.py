@@ -120,11 +120,11 @@ class JetStreamClient:
             await self._client_connection.close()
 
     async def _init_cursor(self) -> None:
-        try:
-            state = await SubscriptionState.objects.aget(service=self._algorithm.name)
-            self._cursor = state.cursor
-        except SubscriptionState.DoesNotExist:
-            self._cursor = 0.0
+        # try:
+        #     state = await SubscriptionState.objects.aget(service=self._algorithm.name)
+        #     self._cursor = state.cursor
+        # except SubscriptionState.DoesNotExist:
+        self._cursor = 0.0
 
     async def _set_cursor(self, cursor: float) -> None:
         self._cursor = cursor
