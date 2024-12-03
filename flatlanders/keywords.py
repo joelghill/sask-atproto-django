@@ -1,5 +1,7 @@
 """Module containing keywords for the Flatlanders algorithm."""
 
+import re
+
 SASK_WORDS = {
     "sask",
     "saskatchewan",
@@ -77,7 +79,7 @@ POLITICAL_WORDS = {
 }
 
 
-POLITICIANS = {
+SASK_POLITICIANS = {
     "Ryan Domotor",
     "Greg Lawrence",
     "Nadine Wilson",
@@ -88,7 +90,8 @@ POLITICIANS = {
     "Meara Conway",
     "Matt Love",
     "Vicki Mowat",
-    "Betty Nippi-Albright", "Betty Nippi",
+    "Betty Nippi-Albright",
+    "Betty Nippi",
     "Erika Ritchie",
     "Nicole Sarauer",
     "Nathaniel Teed",
@@ -143,4 +146,14 @@ POLITICIANS = {
 }
 
 
-POLITICAL_CONTENT = POLITICAL_WORDS.union(POLITICIANS)
+POLITICAL_CONTENT = POLITICAL_WORDS.union(SASK_POLITICIANS)
+
+SASK_CONTENT = SASK_WORDS.union(SASK_POLITICIANS)
+
+COMPILED_PATTERNS = [re.compile(rf"\b{word}\b") for word in SASK_CONTENT]
+
+
+def is_sask_text(text: str) -> bool:
+    """Check if a text contains any of the Saskatchewan keywords"""
+    lower_text = text.lower()
+    return any(pattern.search(lower_text) for pattern in COMPILED_PATTERNS)

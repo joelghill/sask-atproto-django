@@ -1,7 +1,7 @@
 import pytest
 from django.utils import timezone
 
-from flatlanders.algorithms import flatlanders_handler
+from flatlanders.algorithms.flatlanders_feed import FlatlandersAlgorithm
 from flatlanders.models.posts import Post, RegisteredUser
 
 
@@ -19,8 +19,10 @@ def test_flatlanders_handler():
         uri="post3_uri", cid="post3_cid", created_at=timezone.now(), author=user
     )
 
+    algo = FlatlandersAlgorithm()
+
     # Call the flatlanders_handler function
-    result = flatlanders_handler(limit=2, cursor=None)
+    result = algo.get_feed(limit=2, cursor=None)
     cursor = result["cursor"]
 
     # Check the result
@@ -30,7 +32,7 @@ def test_flatlanders_handler():
     assert result["feed"][1]["post"] == "post2_uri"
 
     # Call the flatlanders_handler function with cursor
-    result = flatlanders_handler(limit=2, cursor=cursor)
+    result = algo.get_feed(limit=2, cursor=cursor)
     assert len(result["feed"]) == 1
     assert result["feed"][0]["post"] == "post1_uri"
     

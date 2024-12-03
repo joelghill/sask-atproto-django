@@ -12,10 +12,11 @@ def test_post_create():
         uri="uri",
         cid="cid",
         author=user,
+        author_did=user.did,
         text="text",
         reply_parent=None,
         reply_root=None,
     )
 
-    assert post.author.did == "did"
+    assert post.author_did == "did"
     assert user.posts.first().uri == "uri"
