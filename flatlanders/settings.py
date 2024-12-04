@@ -24,6 +24,7 @@ FEEDGEN_DB_SSL_MODE = os.getenv("FEEDGEN_DB_SSL_MODE", "require")
 FEEDGEN_DB_SSL_CERT = os.getenv("FEEDGEN_DB_SSL_CERT", "")
 FEEDGEN_ADMIN_DID = os.getenv("FEEDGEN_ADMIN_DID", "did:plc:cug2evrqa3nhdbvlfd2cvtky")
 FEEDGEN_PUBLISHER_DID = os.getenv("FEEDGEN_PUBLISHER_DID", "")
+FEEDGEN_MUTE_LIST_URI = os.getenv("FEEDGEN_MUTE_LIST_URI", "at://did:plc:cug2evrqa3nhdbvlfd2cvtky/app.bsky.graph.list/3lbufq3sp4e2a")
 
 PUBLISHER_HANDLE = os.getenv("PUBLISHER_HANDLE", "")
 PUBLISHER_APP_PASSWORD = os.getenv("PUBLISHER_APP_PASSWORD", "")
