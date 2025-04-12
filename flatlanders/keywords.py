@@ -142,8 +142,7 @@ SASK_POLITICIANS = {
     "Christine Tell",
     "Randy Weekes",
     "Gordon Wyant",
-    "Colleen Young",
-    "moe"
+    "Colleen Young"
 }
 
 MUTED_WORDS = [
