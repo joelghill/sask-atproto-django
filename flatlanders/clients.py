@@ -96,7 +96,8 @@ class FlatlandersATProtoClient:
 
         registered_dids_query = RegisteredUser.objects.values_list("did", flat=True)
         registered_dids = await sync_to_async(set)(registered_dids_query)
-    
+        # Ensure the feed owner is included in the list.
+        registered_dids.add(FEEDGEN_PUBLISHER_DID)
         # Followers that are not muted and not registered need to be registered
         to_create = follower_dids.difference(muted_dids, registered_dids)
         # Registered users that are on the mute list need to be deleted.
@@ -131,7 +132,7 @@ class FlatlandersATProtoClient:
             raise FlatlandersATProtoClientError("Admin profile is not logged in")
 
         response = self._client.get_followers(self._admin_profile.did, limit=limit)
-        follower_dids = [FEEDGEN_ADMIN_DID]
+        follower_dids = []
 
         while True:
             batch_dids = [follower.did for follower in response.followers]  # type: ignore
