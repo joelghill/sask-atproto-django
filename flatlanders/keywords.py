@@ -5,7 +5,14 @@ import re
 SASK_WORDS = {
     "sask",
     "saskatchewan",
-    "saskatoon",
+    "in saskatoon",
+    "from saskatoon",
+    "at saskatoon",
+    "to saskatoon",
+    "within saskatoon",
+    "saskatoon city",
+    "city of saskatoon",
+    "saskatoon, sk",
     "saskatchatoon",
     "saskatchewanians",
     "saskatchewanian",
@@ -19,15 +26,8 @@ SASK_WORDS = {
     " yqr ",
     " yqrcc ",
     "skpoli",
-    "bunny hug",
-    "bunnyhug",
-    "bunny-hug",
+    "skpolitics",
     "land of the living skies",
-    "western canada",
-    "canadian prairies",
-    "canadian prairie",
-    "prairie province",
-    "prairie provinces",
 }
 
 
@@ -143,6 +143,7 @@ SASK_POLITICIANS = {
     "Randy Weekes",
     "Gordon Wyant",
     "Colleen Young",
+    "Preimier Moe"
 }
 
 
