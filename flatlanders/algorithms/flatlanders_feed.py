@@ -5,7 +5,7 @@ from typing import Any
 
 from common.models import FeedAlgorithm, JetstreamEventOps, JetstreamEventWrapper
 from flatlanders.algorithms.errors import InvalidCursorError
-from flatlanders.keywords import SASK_WORDS, is_sask_text
+from flatlanders.keywords import SASK_WORDS, is_muted, is_sask_text
 from flatlanders.models.posts import Post
 from flatlanders.models.users import RegisteredUser
 
@@ -98,12 +98,13 @@ class FlatlandersAlgorithm(FeedAlgorithm):
         # Get the text of the post and check if it contains an SK keyword
         is_sask_post = False
         if record_text:
-            is_sask_post = is_sask_text(record_text)
+            is_sask_post = is_sask_text(record_text) and not is_muted(record_text)
 
         # Index post from keyword match
         if is_sask_post:
             logger.info("Indexing post from keyword match")
             await Post.afrom_event(event, is_community_match=True, author=author)
+            return
 
         elif author:
             # Replies to non-indexed posts are ignored
