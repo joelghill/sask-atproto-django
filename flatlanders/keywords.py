@@ -25,8 +25,12 @@ SASK_WORDS = {
     " yxecc ",
     " yqr ",
     " yqrcc ",
-    "skpoli",
-    "skpolitics",
+    " skpoli ",
+    "#yxe",
+    "#yxecc",
+    "#yqr",
+    "#yqrcc",
+    "#skpoli",
     "land of the living skies",
 }
 
@@ -143,18 +147,46 @@ SASK_POLITICIANS = {
     "Randy Weekes",
     "Gordon Wyant",
     "Colleen Young",
-    "Preimier Moe"
+    "premier moe"
 }
+
+MUTED_WORDS = [
+    "elon",
+    "musk",
+    "#abpoli",
+    "#cdnpoli",
+    "#abpoli",
+    "#onpoli",
+    "#pqpoli",
+    "#bcpoli",
+    "#mbpoli",
+    "#pepoli", 
+    "#nspoli", 
+    "#nbpoli", 
+    "#nlpoli", 
+    "#nupoli", 
+    "#ntpoli", 
+    "#ytpoli",
+    "#elxn2025",
+    "#canada"
+]
 
 
 POLITICAL_CONTENT = POLITICAL_WORDS.union(SASK_POLITICIANS)
 
 SASK_CONTENT = SASK_WORDS.union(SASK_POLITICIANS)
 
-COMPILED_PATTERNS = [re.compile(rf"\b{word}\b") for word in SASK_CONTENT]
+COMPILED_PATTERNS = [re.compile(rf"\b{word.lower()}\b") for word in SASK_CONTENT]
+
+COMPILED_MUTE_PATTERNS = [re.compile(rf"\b{word.lower()}\b") for word in MUTED_WORDS]
 
 
 def is_sask_text(text: str) -> bool:
     """Check if a text contains any of the Saskatchewan keywords"""
     lower_text = text.lower()
     return any(pattern.search(lower_text) for pattern in COMPILED_PATTERNS)
+
+def is_muted(text: str) -> bool:
+    """Check if a text contains any of the muted keywords"""
+    lower_text = text.lower()
+    return any(pattern.search(lower_text) for pattern in COMPILED_MUTE_PATTERNS)
