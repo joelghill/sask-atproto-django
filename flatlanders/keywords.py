@@ -18,16 +18,13 @@ SASK_WORDS = {
     " yxecc ",
     " yqr ",
     " yqrcc ",
-    "skpoli",
-    "bunny hug",
-    "bunnyhug",
-    "bunny-hug",
+    " skpoli ",
+    "#yxe",
+    "#yxecc",
+    "#yqr",
+    "#yqrcc",
+    "#skpoli",
     "land of the living skies",
-    "western canada",
-    "canadian prairies",
-    "canadian prairie",
-    "prairie province",
-    "prairie provinces",
 }
 
 
@@ -142,27 +139,28 @@ SASK_POLITICIANS = {
     "Christine Tell",
     "Randy Weekes",
     "Gordon Wyant",
-    "Colleen Young"
+    "Colleen Young",
+    "premier moe"
 }
 
 MUTED_WORDS = [
     "elon",
     "musk",
-    "abpoli",
-    "cdnpoli",
-    "abpoli",
-    "onpoli",
-    "pqpoli",
-    "bcpoli",
-    "mbpoli",
-    "pepoli", 
-    "nspoli", 
-    "nbpoli", 
-    "nlpoli", 
-    "nupoli", 
-    "ntpoli", 
-    "ytpoli",
-    "elxn2025",
+    "#abpoli",
+    "#cdnpoli",
+    "#abpoli",
+    "#onpoli",
+    "#pqpoli",
+    "#bcpoli",
+    "#mbpoli",
+    "#pepoli", 
+    "#nspoli", 
+    "#nbpoli", 
+    "#nlpoli", 
+    "#nupoli", 
+    "#ntpoli", 
+    "#ytpoli",
+    "#elxn2025",
     "#canada"
 ]
 
@@ -171,9 +169,9 @@ POLITICAL_CONTENT = POLITICAL_WORDS.union(SASK_POLITICIANS)
 
 SASK_CONTENT = SASK_WORDS.union(SASK_POLITICIANS)
 
-COMPILED_PATTERNS = [re.compile(rf"\b{word}\b") for word in SASK_CONTENT]
+COMPILED_PATTERNS = [re.compile(rf"\b{word.lower()}\b") for word in SASK_CONTENT]
 
-COMPILED_MUTE_PATTERNS = [re.compile(rf"\b{word}\b") for word in MUTED_WORDS]
+COMPILED_MUTE_PATTERNS = [re.compile(rf"\b{word.lower()}\b") for word in MUTED_WORDS]
 
 
 def is_sask_text(text: str) -> bool:
